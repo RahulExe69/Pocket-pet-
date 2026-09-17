@@ -1,0 +1,24 @@
+{
+  "name": "Pocket Pet",
+  "short_name": "Pocket Pet",
+  "description": "A cute, interactive virtual pet simulator to adopt, feed, care for, and play mini-games with your digital companion.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fef3c7",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/pocket_pet_icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pocket_pet_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

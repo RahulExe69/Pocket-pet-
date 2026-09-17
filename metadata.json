@@ -1,0 +1,6 @@
+{
+  "name": "Pocket Pet",
+  "description": "A cute, interactive virtual pet simulator to adopt, feed, care for, and play mini-games with your digital companion.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
