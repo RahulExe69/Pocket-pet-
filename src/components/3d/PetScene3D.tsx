@@ -39,7 +39,6 @@ interface PetScene3DProps {
   isBathing?: boolean;
   cleanProgress?: number;
   interactive?: boolean;
-  isTalking?: boolean;
 }
 
 export const PetScene3D: React.FC<PetScene3DProps> = ({
@@ -56,7 +55,6 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   isBathing = false,
   cleanProgress = 0,
   interactive = true,
-  isTalking = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -83,11 +81,6 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   useEffect(() => {
     callbacksRef.current = { onEatingComplete, onDrinkingComplete };
   });
-
-  const isTalkingRef = useRef<boolean>(isTalking);
-  useEffect(() => {
-    isTalkingRef.current = isTalking;
-  }, [isTalking]);
 
   // Camera Orbit State
   const cameraAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
@@ -659,34 +652,6 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
           animStateRef.current = 'idle';
           petNodes.bodyGroup.rotation.z = 0;
         }
-      }
-
-      // TALKING ANIMATION (Mouth opens & closes, head bobs cutely, hands gesture)
-      if (isTalkingRef.current && state !== 'sleeping' && petNodes.mouthGroup) {
-        const mouthOpen = 0.35 + Math.abs(Math.sin(t * 18)) * 1.35;
-        petNodes.mouthGroup.scale.set(1.0 + Math.sin(t * 14) * 0.1, mouthOpen, 1.0);
-
-        // Expressive head bob & cute tilt
-        petNodes.headGroup.rotation.z = Math.sin(t * 7) * 0.08;
-        petNodes.headGroup.rotation.x = Math.sin(t * 14) * 0.05;
-        petNodes.headGroup.position.y = 0.21 + Math.abs(Math.sin(t * 14)) * 0.03;
-
-        // Cheeks pulse gently with speech syllables
-        petNodes.cheeksGroup.scale.set(
-          1.0 + Math.abs(Math.sin(t * 14)) * 0.1,
-          1.0 + Math.abs(Math.sin(t * 18)) * 0.06,
-          1.0
-        );
-
-        // Little paws gesturing cutely while talking
-        if (state === 'idle') {
-          petNodes.leftArm.rotation.x = -0.35 + Math.sin(t * 10) * 0.22;
-          petNodes.rightArm.rotation.x = -0.35 - Math.sin(t * 10) * 0.22;
-          petNodes.leftArm.rotation.z = 0.15 + Math.sin(t * 8) * 0.12;
-          petNodes.rightArm.rotation.z = -0.15 - Math.sin(t * 8) * 0.12;
-        }
-      } else if (petNodes.mouthGroup) {
-        petNodes.mouthGroup.scale.set(0.85, 0.28, 0.85);
       }
 
       // 1) Hamster face always front-facing looking at camera

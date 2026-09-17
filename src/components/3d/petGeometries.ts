@@ -15,7 +15,6 @@ export interface PetNodes {
   root: THREE.Group;
   bodyGroup: THREE.Group;
   headGroup: THREE.Group;
-  mouthGroup: THREE.Group;
   leftEar: THREE.Group;
   rightEar: THREE.Group;
   leftEye: THREE.Mesh;
@@ -36,11 +35,6 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
 
   const palette = COLOR_PALETTES[type] || COLOR_PALETTES.hamster;
   const isHamster = type === 'hamster';
-
-  // Make hamster 30% smaller in size (0.7x scale) for an extra cute, petite dollhouse proportion
-  if (isHamster) {
-    root.scale.set(0.7, 0.7, 0.7);
-  }
 
   // Body group for breathing, bouncing, rotation
   const bodyGroup = new THREE.Group();
@@ -115,39 +109,6 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   const philtrum = new THREE.Mesh(philtrumGeo, philtrumMat);
   philtrum.position.set(0, 0.052, 0.640);
   headGroup.add(philtrum);
-
-  // 4b. Cute animated mouth (opens and closes when hamster is talking!)
-  const mouthGroup = new THREE.Group();
-  mouthGroup.name = 'pet-mouth-group';
-  mouthGroup.position.set(0, 0.024, 0.635);
-
-  const mouthCavityGeo = new THREE.SphereGeometry(0.032, 12, 10);
-  mouthCavityGeo.scale(1.2, 0.8, 0.5);
-  const mouthCavityMat = getToonMaterial(0xb33951, 0.4);
-  const mouthCavity = new THREE.Mesh(mouthCavityGeo, mouthCavityMat);
-  mouthCavity.name = 'mouth-cavity';
-  mouthGroup.add(mouthCavity);
-
-  const tongueGeo = new THREE.SphereGeometry(0.018, 10, 8);
-  tongueGeo.scale(1.0, 0.5, 0.8);
-  const tongueMat = getToonMaterial(0xff94a8, 0.35);
-  const tongue = new THREE.Mesh(tongueGeo, tongueMat);
-  tongue.position.set(0, -0.01, 0.01);
-  mouthGroup.add(tongue);
-
-  // 2 tiny cute front teeth
-  const toothGeo = new THREE.BoxGeometry(0.013, 0.022, 0.008);
-  const toothMat = getToonMaterial(0xffffff, 0.1);
-  const toothL = new THREE.Mesh(toothGeo, toothMat);
-  toothL.position.set(-0.007, 0.01, 0.012);
-  mouthGroup.add(toothL);
-  const toothR = new THREE.Mesh(toothGeo, toothMat);
-  toothR.position.set(0.007, 0.01, 0.012);
-  mouthGroup.add(toothR);
-
-  // Default resting mouth is a closed cute smile
-  mouthGroup.scale.set(0.85, 0.28, 0.85);
-  headGroup.add(mouthGroup);
 
   // Delicate realistic hamster whiskers (3 on left, 3 on right)
   const whiskerMat = new THREE.LineBasicMaterial({
@@ -447,7 +408,6 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
     root,
     bodyGroup,
     headGroup,
-    mouthGroup,
     leftEar,
     rightEar,
     leftEye,

@@ -5,16 +5,6 @@ import { PetState, PetMood, FoodItem } from '../types';
 import { PetScene3D } from './3d/PetScene3D';
 import { SpeechBubble } from './SpeechBubble';
 import { soundManager } from '../utils/audio';
-import {
-  SupportedLanguage,
-  LANGUAGE_CONFIGS,
-  startVoiceRecognition,
-  stopVoiceRecognition,
-  speakHamsterVoice,
-  isSpeechRecognitionSupported,
-} from '../utils/speechEngine';
-import { HamsterChatModal } from './HamsterChatModal';
-import { RepeatModal } from './RepeatModal';
 
 interface HomeScreenProps {
   pet: PetState;
@@ -117,91 +107,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     energy: number;
     icon: string;
   } | null>(null);
-
-  // Talking & Voice States: BN | HI | EN
-  const [selectedLang, setSelectedLang] = useState<SupportedLanguage>('EN');
-  const [isListeningRepeat, setIsListeningRepeat] = useState<boolean>(false);
-  const [isHamsterTalking, setIsHamsterTalking] = useState<boolean>(false);
-  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-  const [isRepeatModalOpen, setIsRepeatModalOpen] = useState<boolean>(false);
-  const [customSpeechText, setCustomSpeechText] = useState<string | null>(null);
-  const [speechNotice, setSpeechNotice] = useState<string | null>(null);
-
-  // Hamster Voice Output with Web Speech API (Pitch: 1.5, mouth animates, text bubble above hamster)
-  const handleHamsterSpeak = (text: string) => {
-    setCustomSpeechText(text);
-    setIsHamsterTalking(true);
-
-    speakHamsterVoice({
-      text,
-      lang: selectedLang,
-      onStart: () => {
-        setIsHamsterTalking(true);
-      },
-      onEnd: () => {
-        setIsHamsterTalking(false);
-        setTimeout(() => {
-          setCustomSpeechText((prev) => (prev === text ? null : prev));
-        }, 3200);
-      },
-    });
-  };
-
-  // Language switch handler
-  const handleSelectLanguage = (lang: SupportedLanguage) => {
-    soundManager.playPop();
-    setSelectedLang(lang);
-    const config = LANGUAGE_CONFIGS[lang];
-    setSpeechNotice(`${config.name} (${config.nativeName}) selected! ✨`);
-    setTimeout(() => setSpeechNotice(null), 2200);
-  };
-
-  // Repeat button click handler: user speaks, hamster repeats in cute high-pitch voice
-  const handleRepeatClick = () => {
-    if (isListeningRepeat) {
-      stopVoiceRecognition();
-      setIsListeningRepeat(false);
-      setSpeechNotice(null);
-      return;
-    }
-
-    if (pet.isSleeping) {
-      onToggleSleep();
-    }
-
-    soundManager.playPop();
-
-    if (!isSpeechRecognitionSupported()) {
-      setIsRepeatModalOpen(true);
-      return;
-    }
-
-    setIsListeningRepeat(true);
-    const config = LANGUAGE_CONFIGS[selectedLang];
-    setSpeechNotice(`🎙️ ${config.listeningText}`);
-
-    startVoiceRecognition({
-      lang: selectedLang,
-      onResult: (transcript) => {
-        setIsListeningRepeat(false);
-        setSpeechNotice(null);
-        handleHamsterSpeak(transcript);
-      },
-      onError: (err) => {
-        setIsListeningRepeat(false);
-        setSpeechNotice(null);
-        if (err?.error === 'not-allowed' || err?.error === 'service-not-allowed') {
-          setIsRepeatModalOpen(true);
-        } else if (err?.error !== 'no-speech') {
-          setIsRepeatModalOpen(true);
-        }
-      },
-      onEnd: () => {
-        setIsListeningRepeat(false);
-        setSpeechNotice(null);
-      },
-    });
-  };
 
   // Sync external feed/water triggers from App level
   React.useEffect(() => {
@@ -409,39 +314,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </header>
 
-      {/* 3 LANGUAGE BUTTONS TOP: BN | HI | EN */}
-      <div className="relative z-20 px-3 pb-1 flex justify-center items-center">
-        <div
-          id="lang-selector-bar"
-          className={`flex items-center p-1 rounded-full border shadow-xs backdrop-blur-md gap-1 transition-all ${
-            pet.isSleeping
-              ? 'bg-slate-800/90 border-slate-700'
-              : 'bg-white/95 border-pink-200/90'
-          }`}
-        >
-          {(['BN', 'HI', 'EN'] as const).map((lang) => {
-            const isSelected = selectedLang === lang;
-            return (
-              <button
-                key={lang}
-                id={`btn-lang-${lang.toLowerCase()}`}
-                onClick={() => handleSelectLanguage(lang)}
-                className={`px-3 py-1 rounded-full font-bubble text-xs font-black transition-all active:scale-95 flex items-center gap-1 ${
-                  isSelected
-                    ? 'bg-gradient-to-r from-pink-500 to-rose-400 text-white shadow-xs scale-105'
-                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100/80'
-                }`}
-              >
-                <span>{lang}</span>
-                <span className="text-[10px] opacity-80 font-normal">
-                  {lang === 'BN' ? 'বাংলা' : lang === 'HI' ? 'हिन्दी' : 'EN'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* METERS STATUS BAR */}
       <div className="relative z-20 px-3">
         <div
@@ -554,7 +426,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           waterTrigger={waterTrigger}
           isBathing={isCleanOpen}
           interactive={!pet.isSleeping}
-          isTalking={isHamsterTalking}
         />
 
         {/* Floating Speech Bubble Above 3D Pet */}
@@ -562,29 +433,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <div className="pointer-events-auto max-w-[280px]">
             <SpeechBubble
               mood={mood}
-              customMessage={customSpeechText || customSpeechMessage}
+              customMessage={customSpeechMessage}
               onBubbleClick={onPetClick}
-              isTalking={isHamsterTalking}
             />
           </div>
         </div>
-
-        {/* Floating Speech / Listening Notice */}
-        <AnimatePresence>
-          {speechNotice && (
-            <motion.div
-              initial={{ scale: 0.85, y: -10, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.85, y: -10, opacity: 0 }}
-              className="absolute top-18 z-30 pointer-events-none px-4 py-1.5 rounded-full bg-stone-900/85 text-white backdrop-blur-md text-xs font-bubble font-bold shadow-lg flex items-center gap-2 border border-stone-700"
-            >
-              {isListeningRepeat && (
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
-              )}
-              <span>{speechNotice}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Floating Stat Boost Toast Banner */}
         <AnimatePresence>
