@@ -1220,79 +1220,50 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
       />
 
-      {/* Touch-Friendly 3D Bowl Quick Tap Badges (Over Bowls Area) */}
-      <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5 pointer-events-auto">
-        <button
-          id="btn-3d-bowl-feed"
-          onClick={() => {
-            soundManager.playPop();
-            if (onOpenFeed) onOpenFeed();
-          }}
-          title="Interact with Food Bowl"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-2xl bg-white/90 backdrop-blur-md border border-amber-300/80 shadow-xs text-[11px] font-bubble font-bold text-amber-900 active:scale-95 transition-transform hover:bg-amber-50"
-        >
-          <span>🥣</span>
-          <span>Feed 🌻</span>
-        </button>
-
-        <button
-          id="btn-3d-bowl-water"
-          onClick={() => {
-            soundManager.playPop();
-            if (onGiveWater) onGiveWater();
-          }}
-          title="Interact with Water Bowl"
-          className="flex items-center gap-1 px-2.5 py-1 rounded-2xl bg-white/90 backdrop-blur-md border border-sky-300/80 shadow-xs text-[11px] font-bubble font-bold text-sky-900 active:scale-95 transition-transform hover:bg-sky-50"
-        >
-          <span>💧</span>
-          <span>Water</span>
-        </button>
-      </div>
-
       {/* 3D Scene Controls Overlay (Floating Top-Right) */}
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-white/80 backdrop-blur-md px-2 py-1 rounded-2xl border border-amber-200/80 shadow-xs">
+      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-md p-0.5 rounded-xl border border-pink-200/90 shadow-xs">
         <button
           id="btn-camera-preset-front"
           onClick={() => handleCameraPreset('front')}
           title="Front View"
-          className={`p-1.5 rounded-xl transition-all ${
+          className={`p-1 rounded-lg transition-all ${
             cameraMode === 'front'
-              ? 'bg-amber-500 text-white shadow-xs font-bold'
-              : 'text-stone-600 hover:bg-amber-100/60'
+              ? 'bg-pink-500 text-white shadow-xs font-bold'
+              : 'text-stone-600 hover:bg-pink-100/60'
           }`}
         >
-          <Eye size={14} />
+          <Eye size={13} />
         </button>
         <button
           id="btn-camera-preset-angled"
           onClick={() => handleCameraPreset('angled')}
           title="Angled Room View"
-          className={`p-1.5 rounded-xl transition-all ${
+          className={`p-1 rounded-lg transition-all ${
             cameraMode === 'angled'
-              ? 'bg-amber-500 text-white shadow-xs font-bold'
-              : 'text-stone-600 hover:bg-amber-100/60'
+              ? 'bg-pink-500 text-white shadow-xs font-bold'
+              : 'text-stone-600 hover:bg-pink-100/60'
           }`}
         >
-          <RotateCw size={14} />
+          <RotateCw size={13} />
         </button>
         <button
           id="btn-camera-preset-top"
           onClick={() => handleCameraPreset('top')}
           title="Top Isometric View"
-          className={`p-1.5 rounded-xl transition-all ${
+          className={`p-1 rounded-lg transition-all ${
             cameraMode === 'top'
-              ? 'bg-amber-500 text-white shadow-xs font-bold'
-              : 'text-stone-600 hover:bg-amber-100/60'
+              ? 'bg-pink-500 text-white shadow-xs font-bold'
+              : 'text-stone-600 hover:bg-pink-100/60'
           }`}
         >
-          <ZoomIn size={14} />
+          <ZoomIn size={13} />
         </button>
       </div>
 
       {/* Swipe to Rotate & Tap to Move Guide Hint */}
-      <div className="absolute bottom-1 pointer-events-none z-10 flex items-center gap-1 text-[10px] font-bold text-stone-600/90 bg-white/75 backdrop-blur-[2px] px-3 py-0.5 rounded-full border border-stone-200/60 shadow-xs">
-        <Sparkles size={10} className="text-amber-500" />
-        <span>Tap floor to move • Drag to rotate • Tap pet or items</span>
+      <div className="absolute bottom-1 pointer-events-none z-10 flex items-center gap-1 text-[10px] font-bold text-stone-600/90 bg-white/80 backdrop-blur-xs px-2.5 py-0.5 rounded-full border border-pink-200/60 shadow-xs">
+        <Sparkles size={9} className="text-pink-500" />
+        <span>Tap floor to walk • Drag to rotate</span>
       </div>
     </div>
   );

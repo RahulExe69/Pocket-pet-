@@ -46,7 +46,7 @@ export const SpeechBubble: React.FC<SpeechBubbleProps> = ({
           exit={{ opacity: 0, scale: 0.85, y: -6 }}
           transition={{ type: 'spring', stiffness: 350, damping: 24 }}
           onClick={onBubbleClick}
-          className="relative bg-white/95 backdrop-blur-sm border-2 border-stone-200/90 shadow-md px-4 py-2 rounded-2xl text-stone-800 text-xs sm:text-sm font-semibold tracking-wide text-center leading-snug max-w-[290px] sm:max-w-[380px] cursor-pointer hover:scale-105 active:scale-95 transition-transform whitespace-pre-line"
+          className="relative bg-white/95 backdrop-blur-md border-2 border-pink-200 shadow-lg shadow-pink-950/5 px-4 py-2 rounded-2xl text-stone-800 text-xs sm:text-sm font-semibold tracking-wide text-center leading-snug max-w-[290px] sm:max-w-[380px] max-h-[130px] overflow-y-auto no-scrollbar cursor-pointer hover:scale-105 active:scale-95 transition-transform whitespace-pre-line"
         >
           <span>{currentText}</span>
 
@@ -55,7 +55,7 @@ export const SpeechBubble: React.FC<SpeechBubbleProps> = ({
             className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-t-[8px] border-t-white"
           />
           <div
-            className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[9px] border-t-stone-200/80 -z-10"
+            className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[9px] border-t-pink-200 -z-10"
           />
         </motion.div>
       </AnimatePresence>

@@ -768,90 +768,68 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       )}
 
       {/* TOP HEADER: Level, Coins, Navigation icons */}
-      <header className="relative z-20 p-2.5 sm:p-3 flex items-center justify-between gap-1.5 sm:gap-2">
-        {/* Left: App Logo & Pet Passport */}
-        <div className="flex items-center gap-1.5">
-          {/* Official Pocket Pet App Header Logo */}
-          <div
-            id="app-header-brand-logo"
-            className={`flex items-center gap-1.5 px-2 py-1 rounded-2xl border shadow-xs select-none ${
-              pet.isSleeping
-                ? 'bg-slate-800/90 border-slate-700 text-white'
-                : 'bg-white/95 border-amber-200 text-stone-800'
-            }`}
-          >
-            <div className="w-7 h-7 rounded-xl overflow-hidden border border-amber-300 shadow-xs shrink-0 bg-amber-50">
+      <header className="relative z-20 px-3 pt-2.5 pb-1 flex items-center justify-between gap-2 shrink-0">
+        {/* Left: Pet Passport / Level */}
+        <button
+          id="btn-open-profile"
+          onClick={onOpenProfile}
+          className={`flex items-center gap-1.5 p-1 pr-2.5 rounded-2xl border shadow-xs transition-all active:scale-95 cursor-pointer ${
+            pet.isSleeping
+              ? 'bg-slate-800/90 border-slate-700 text-white'
+              : 'bg-white/95 border-pink-200/90 text-stone-800 hover:bg-pink-50/50'
+          }`}
+          title="View Pet Profile & Passport"
+        >
+          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-pink-200/60 shadow-xs">
+            {pet.type === 'hamster' ? (
               <img
                 src="/pocket_pet_icon.png"
-                alt="Pocket Pet Logo"
-                className="w-full h-full object-cover"
+                alt={pet.name}
+                className="w-full h-full object-cover rounded-xl"
                 referrerPolicy="no-referrer"
               />
-            </div>
-            <span className="font-bubble text-xs font-extrabold tracking-tight text-amber-900 hidden xs:inline">
-              Pocket <span className="text-amber-600">Pet</span>
-            </span>
+            ) : (
+              <>
+                {pet.type === 'cat' && '🐱'}
+                {pet.type === 'dog' && '🐶'}
+                {pet.type === 'bunny' && '🐰'}
+                {pet.type === 'panda' && '🐼'}
+              </>
+            )}
           </div>
+          <div className="text-left">
+            <div className="font-bubble text-xs font-bold leading-tight flex items-center gap-1">
+              <span className="truncate max-w-[85px]">{pet.name}</span>
+              <span className="text-[9px] bg-pink-500 text-white px-1 py-0.5 rounded-md font-bold">
+                L{pet.level}
+              </span>
+            </div>
+          </div>
+        </button>
 
-          {/* Pet Passport / Level */}
-          <button
-            id="btn-open-profile"
-            onClick={onOpenProfile}
-            className={`flex items-center gap-1.5 p-1 pr-2.5 rounded-2xl border shadow-xs transition-all active:scale-95 ${
-              pet.isSleeping
-                ? 'bg-slate-800/90 border-slate-700 text-white'
-                : 'bg-white/90 border-amber-200 text-stone-800'
-            }`}
-          >
-            <div className="w-7 h-7 rounded-xl bg-amber-400/20 flex items-center justify-center text-sm overflow-hidden shrink-0">
-              {pet.type === 'hamster' ? (
-                <img
-                  src="/pocket_pet_icon.png"
-                  alt={pet.name}
-                  className="w-full h-full object-cover rounded-xl"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <>
-                  {pet.type === 'cat' && '🐱'}
-                  {pet.type === 'dog' && '🐶'}
-                  {pet.type === 'bunny' && '🐰'}
-                  {pet.type === 'panda' && '🐼'}
-                </>
-              )}
-            </div>
-            <div className="text-left">
-              <div className="font-bubble text-xs font-bold leading-tight flex items-center gap-1">
-                <span className="truncate max-w-[65px]">{pet.name}</span>
-                <span className="text-[9px] bg-amber-500 text-white px-1 rounded-sm font-bold">
-                  L{pet.level}
-                </span>
-              </div>
-            </div>
-          </button>
+        {/* Center: Coins Badge */}
+        <div
+          className={`flex items-center gap-1 px-3 py-1 rounded-2xl border shadow-xs font-bubble text-xs font-bold ${
+            pet.isSleeping
+              ? 'bg-slate-800/90 border-slate-700 text-amber-300'
+              : 'bg-white/95 border-amber-200 text-amber-800 shadow-amber-900/5'
+          }`}
+          title="Your Pocket Coins"
+        >
+          <span className="text-sm">🪙</span>
+          <span className="font-extrabold">{pet.coins}</span>
         </div>
 
-        {/* Right tools: Coins, Daily Reward, Settings */}
+        {/* Right Tools: Daily Reward & Settings */}
         <div className="flex items-center gap-1.5">
-          {/* Coins badge */}
-          <div
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-2xl border shadow-xs font-bubble text-xs font-bold ${
-              pet.isSleeping
-                ? 'bg-slate-800/90 border-slate-700 text-amber-300'
-                : 'bg-white/90 border-amber-200 text-amber-800'
-            }`}
-          >
-            <span className="text-sm">🪙</span>
-            <span>{pet.coins}</span>
-          </div>
-
           {/* Daily reward gift button */}
           <button
             id="btn-open-daily-reward"
             onClick={onOpenDailyRewards}
-            className="relative p-2 rounded-2xl bg-white/90 border border-amber-200 shadow-xs text-amber-700 hover:bg-amber-50 active:scale-95 transition-transform"
+            className="relative p-2 rounded-2xl bg-white/95 border border-pink-200 shadow-xs text-amber-700 hover:bg-amber-50 active:scale-95 transition-transform cursor-pointer"
+            title="Claim Daily Login Gift"
           >
-            <Gift size={18} />
+            <Gift size={17} />
             {dailyRewardAvailable && (
               <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-white animate-ping" />
             )}
@@ -861,16 +839,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             id="btn-open-settings"
             onClick={onOpenSettings}
-            className="p-2 rounded-2xl bg-white/90 border border-stone-200 shadow-xs text-stone-600 hover:bg-stone-50 active:scale-95 transition-transform"
+            className="p-2 rounded-2xl bg-white/95 border border-stone-200 shadow-xs text-stone-600 hover:bg-stone-50 active:scale-95 transition-transform cursor-pointer"
+            title="Settings & Audio Options"
           >
-            <Settings size={18} />
+            <Settings size={17} />
           </button>
         </div>
       </header>
 
-      {/* MULTIPLAYER & UNIQUE PET ID BAR (Top) */}
-      <div className="relative z-20 px-2.5 sm:px-3 -mt-1 mb-1.5 flex items-center justify-between gap-1.5 flex-wrap">
-        {/* Unique Pet ID for Each User (Shown at top) */}
+      {/* SUB-RIBBON: Language, Pet ID, Multiplayer & Games (Single Non-Wrapping Row) */}
+      <div className="relative z-20 px-3 py-0.5 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+        {/* Unique Pet ID */}
         <button
           id="pet-id-top-display"
           onClick={() => {
@@ -881,21 +860,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               setTimeout(() => setPetIdCopied(false), 2000);
             }
           }}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-2xl border shadow-xs font-bubble text-xs cursor-pointer active:scale-95 transition-all ${
+          className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-xl border shadow-xs font-bubble text-xs cursor-pointer active:scale-95 transition-all ${
             pet.isSleeping
-              ? 'bg-slate-800/90 border-slate-700 text-pink-300 hover:bg-slate-700/90'
-              : 'bg-white/95 border-pink-200 text-pink-800 hover:bg-pink-50'
+              ? 'bg-slate-800/90 border-slate-700 text-pink-300'
+              : 'bg-white/90 border-pink-200 text-pink-800 hover:bg-pink-50'
           }`}
-          title="Click to copy your Unique Pet ID"
+          title="Tap to copy your Pet ID"
         >
           <span className="text-xs">🏷️</span>
-          <span className="font-bold">Pet ID:</span>
-          <span className="font-mono font-extrabold text-pink-950 bg-pink-50 px-1.5 py-0.5 rounded-lg border border-pink-200 text-[11px] tracking-wider">
+          <span className="font-mono font-bold text-[11px] text-pink-900">
             {pet.id || 'HAM-8821'}
           </span>
           {petIdCopied && (
-            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 animate-fade-in">
-              Copied! ✨
+            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded-full border border-emerald-200 animate-fade-in">
+              Copied!
             </span>
           )}
         </button>
@@ -903,7 +881,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* 3 Top Language Buttons: [BN] [HI] [EN] */}
         <div
           id="top-language-selector"
-          className="flex items-center bg-white/95 backdrop-blur-xs rounded-2xl border border-pink-200 p-0.5 shadow-xs font-bubble text-xs"
+          className="shrink-0 flex items-center bg-white/95 backdrop-blur-xs rounded-xl border border-pink-200 p-0.5 shadow-xs font-bubble text-xs"
           title="Select Talking Language"
         >
           {(['BN', 'HI', 'EN'] as TalkingLanguage[]).map((lang) => (
@@ -911,9 +889,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               key={lang}
               id={`btn-top-lang-${lang.toLowerCase()}`}
               onClick={() => handleLanguageSelect(lang)}
-              className={`px-2 py-0.5 rounded-xl font-bold transition-all cursor-pointer ${
+              className={`px-1.5 py-0.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
                 selectedLanguage === lang
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xs scale-105'
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xs'
                   : 'text-stone-600 hover:text-pink-600 hover:bg-pink-50'
               }`}
             >
@@ -922,54 +900,52 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ))}
         </div>
 
-        {/* Multiplayer & Mini-Games Action Buttons */}
-        <div className="flex items-center gap-1.5">
-          {/* Multiplayer Room Button */}
-          <button
-            id="btn-open-multiplayer"
-            onClick={onOpenMultiplayer}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-2xl border shadow-xs transition-all active:scale-95 font-bubble text-xs font-bold cursor-pointer ${
-              currentRoom
-                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400 ring-2 ring-pink-300 shadow-md'
-                : 'bg-white/95 border-pink-300 text-pink-700 hover:bg-pink-50'
-            }`}
-          >
-            <Users size={13} />
-            <span>{currentRoom ? `Room #${currentRoom.code}` : 'Multiplayer'}</span>
-            {currentRoom?.guest && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
-            )}
-          </button>
+        {/* Multiplayer Room Button */}
+        <button
+          id="btn-open-multiplayer"
+          onClick={onOpenMultiplayer}
+          className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-xl border shadow-xs transition-all active:scale-95 font-bubble text-xs font-bold cursor-pointer ${
+            currentRoom
+              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400 shadow-xs'
+              : 'bg-white/90 border-pink-200 text-pink-700 hover:bg-pink-50'
+          }`}
+          title="Play with a friend in Multiplayer"
+        >
+          <Users size={12} />
+          <span className="text-[11px]">{currentRoom ? `#${currentRoom.code}` : 'Multi'}</span>
+          {currentRoom?.guest && (
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          )}
+        </button>
 
-          {/* Mini-Games Button (Race, Hide & Seek, Ball Play) */}
-          <button
-            id="btn-open-multiplayer-minigames"
-            onClick={onOpenMiniGames}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white border border-purple-400 shadow-xs font-bubble text-xs font-bold hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-            title="Mini-Games: Race, Hide & Seek, Ball Play"
-          >
-            <Gamepad2 size={13} />
-            <span>Mini-Games</span>
-          </button>
-        </div>
+        {/* Mini-Games Button */}
+        <button
+          id="btn-open-multiplayer-minigames"
+          onClick={onOpenMiniGames}
+          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white border border-purple-400 shadow-xs font-bubble text-xs font-bold hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+          title="Mini-Games: Race, Hide & Seek, Ball Play"
+        >
+          <Gamepad2 size={12} />
+          <span className="text-[11px]">Games</span>
+        </button>
       </div>
 
       {/* METERS STATUS BAR */}
-      <div className="relative z-20 px-3">
+      <div className="relative z-20 px-3 py-1 shrink-0">
         <div
-          className={`grid grid-cols-4 gap-2 p-2.5 rounded-2xl border shadow-xs transition-colors ${
+          className={`grid grid-cols-4 gap-2 p-2 rounded-2xl border shadow-xs transition-colors ${
             pet.isSleeping
               ? 'bg-slate-900/80 border-slate-700 text-white'
-              : 'bg-white/85 backdrop-blur-xs border-amber-200/80 text-stone-700'
+              : 'bg-white/90 backdrop-blur-xs border-pink-200/80 text-stone-700'
           }`}
         >
           {/* Hunger Meter */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-[11px] font-bold">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
               <span>🍖 Hunger</span>
               <span>{pet.stats.hunger}%</span>
             </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
               <motion.div
                 className={`h-full rounded-full ${
                   pet.stats.hunger < 30
@@ -985,12 +961,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           {/* Happiness Meter */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-[11px] font-bold">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
               <span>❤️ Happy</span>
               <span>{pet.stats.happiness}%</span>
             </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
               <motion.div
                 className={`h-full rounded-full ${
                   pet.stats.happiness < 30
@@ -1006,12 +982,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           {/* Energy Meter */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-[11px] font-bold">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
               <span>⚡ Energy</span>
               <span>{pet.stats.energy}%</span>
             </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
               <motion.div
                 className={`h-full rounded-full ${
                   pet.stats.energy < 30
@@ -1027,12 +1003,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           {/* Cleanliness Meter */}
-          <div className="flex flex-col gap-1">
-            <div className="flex justify-between text-[11px] font-bold">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
               <span>🧼 Clean</span>
               <span>{pet.stats.cleanliness}%</span>
             </div>
-            <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
               <motion.div
                 className={`h-full rounded-full ${
                   pet.stats.cleanliness < 30
@@ -1052,7 +1028,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* MAIN PET ROOM INTERACTIVE 3D STAGE */}
       <div
         id="pet-room-stage"
-        className="relative flex-1 w-full h-full min-h-[340px] flex flex-col items-center justify-center my-1 z-10 overflow-hidden"
+        className="relative flex-1 w-full min-h-[190px] flex flex-col items-center justify-center my-0.5 z-10 overflow-hidden"
       >
         {/* Full 3D Interactive WebGL Scene */}
         <PetScene3D
@@ -1076,15 +1052,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           isTalking={isTalking}
         />
 
+        {/* Floating Quick Closet Button (Top Left of 3D Scene) */}
+        <div className="absolute top-2 left-2 z-20 pointer-events-auto">
+          <button
+            id="btn-quick-closet"
+            onClick={onOpenCustomization}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/90 backdrop-blur-md border border-pink-200/90 shadow-xs text-[11px] font-bubble font-bold text-pink-700 hover:bg-pink-50 active:scale-95 transition-all cursor-pointer"
+            title="Open Wardrobe & Closet"
+          >
+            <Shirt size={12} />
+            <span>Closet</span>
+          </button>
+        </div>
+
         {/* Friend In-Room Presence Banner */}
         {friendPet && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full border border-pink-300 shadow-md pointer-events-none">
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full border border-pink-300 shadow-md pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span className="text-xs font-bubble font-bold text-pink-800 whitespace-nowrap">
-              Friend <span className="text-pink-900 font-extrabold">{friendPet.petName}</span> is in the room! 💖
+              Friend <span className="text-pink-900 font-extrabold">{friendPet.petName}</span> is here! 💖
             </span>
             {activeGame && (
-              <span className="text-[10px] bg-pink-100 text-pink-900 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              <span className="text-[9px] bg-pink-100 text-pink-900 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
                 {activeGame}
               </span>
             )}
@@ -1093,7 +1082,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Floating Speech Bubble Above 3D Pet */}
         <div className="absolute top-2 left-0 right-0 pointer-events-none z-20 flex justify-center px-3">
-          <div className="pointer-events-auto max-w-[340px] sm:max-w-[420px] w-full flex justify-center">
+          <div className="pointer-events-auto max-w-[320px] sm:max-w-[400px] w-full flex justify-center">
             <SpeechBubble
               mood={mood}
               customMessage={localSpeechMessage || customSpeechMessage}
@@ -1145,126 +1134,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* QUICK WARDROBE & BOUTIQUE SHORTCUT CHIPS */}
-      <div className="relative z-20 px-4 py-1 flex justify-center gap-2">
-        <button
-          id="btn-quick-closet"
-          onClick={onOpenCustomization}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/90 border border-pink-200 shadow-xs text-xs font-bubble font-bold text-pink-700 hover:bg-pink-50 active:scale-95 transition-all"
-        >
-          <Shirt size={14} /> Closet & Style
-        </button>
-        <button
-          id="btn-quick-shop"
-          onClick={onOpenShop}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/90 border border-amber-200 shadow-xs text-xs font-bubble font-bold text-amber-800 hover:bg-amber-50 active:scale-95 transition-all"
-        >
-          <ShoppingBag size={14} /> Boutique 🪙
-        </button>
-      </div>
-
-      {/* TOUCH-FRIENDLY 3-FOOD SELECTION TRAY */}
-      <AnimatePresence>
-        {isQuickFoodOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative z-30 px-3 pb-2"
-          >
-            <div className="bg-white/95 backdrop-blur-md rounded-3xl border-2 border-amber-200 shadow-xl p-3 flex flex-col gap-2.5">
-              {/* Header */}
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-lg">🥣</span>
-                  <h3 className="font-bubble font-bold text-stone-800 text-sm">
-                    Feed {pet.name} — Choose a Meal
-                  </h3>
-                </div>
-                <button
-                  id="btn-close-quick-food"
-                  onClick={() => setIsQuickFoodOpen(false)}
-                  className="p-1 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* 3 Distinct Touch-Friendly Food Cards */}
-              <div className="grid grid-cols-3 gap-2">
-                {THREE_FOODS.map((food) => {
-                  const invCount = pet.inventory[food.id] || 0;
-                  return (
-                    <button
-                      key={food.id}
-                      id={`btn-feed-${food.id}`}
-                      onClick={() => handleSelectFood(food)}
-                      className={`flex flex-col items-center justify-between p-2.5 rounded-2xl border-2 ${food.borderColor} ${food.colorBg} active:scale-95 transition-all text-left shadow-xs group min-h-[110px]`}
-                    >
-                      <div className="w-full flex justify-between items-start">
-                        <span className="text-3xl group-hover:scale-110 transition-transform">
-                          {food.icon}
-                        </span>
-                        <span className="text-[10px] font-bold font-bubble text-amber-900 bg-white/90 px-1.5 py-0.5 rounded-full border border-amber-200 shadow-xs">
-                          {food.tag}
-                        </span>
-                      </div>
-
-                      <div className="w-full mt-1.5">
-                        <span className="block font-bubble font-bold text-stone-900 text-xs truncate">
-                          {food.name}
-                        </span>
-                        <div className="flex items-center gap-1 text-[10px] font-bold font-bubble mt-0.5">
-                          <span className="text-emerald-700">+{food.hungerBoost} 🍖</span>
-                          <span className="text-amber-700">+{food.energyBoost} ⚡</span>
-                        </div>
-                      </div>
-
-                      <div className="w-full flex justify-between items-center text-[10px] font-bubble font-bold text-stone-500 mt-1 pt-1 border-t border-stone-200/60">
-                        <span>Owned: {invCount}</span>
-                        <span className="text-amber-600 font-bold">Feed ➔</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Browse Pantry button */}
-              <div className="flex justify-between items-center pt-1 border-t border-stone-100">
-                <span className="text-[11px] text-stone-500 font-medium pl-1">
-                  Hamster will waddle to 3D bowl to eat!
-                </span>
-                <button
-                  id="btn-open-full-pantry"
-                  onClick={() => {
-                    setIsQuickFoodOpen(false);
-                    onOpenFeed();
-                  }}
-                  className="flex items-center gap-1 text-xs font-bubble font-bold text-amber-700 hover:text-amber-800 bg-amber-100/60 hover:bg-amber-100 px-3 py-1 rounded-full border border-amber-300/60 active:scale-95 transition-all"
-                >
-                  <span>All Foods 🎒</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* 2 MAIN ACTION BUTTONS: BUTTON 1 = REPEAT & BUTTON 2 = ANSWER */}
-      <div className="relative z-20 px-3 pt-0 pb-1.5 flex items-stretch justify-center gap-2">
+      <div className="relative z-20 px-3 pt-0.5 pb-1.5 flex items-stretch justify-center gap-1.5 sm:gap-2 shrink-0">
         {/* BUTTON 1 = REPEAT */}
-        <div className="flex-1 flex items-stretch">
+        <div className="flex-1 min-w-0 flex items-stretch gap-1">
           <button
             id="btn-action-repeat"
             onClick={handleDirectRepeat}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-2.5 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none min-h-[50px] ${
               isContinuousRepeat
                 ? repeatPhase === 'speaking'
                   ? 'bg-gradient-to-r from-amber-500 via-pink-500 to-rose-500 text-white border-pink-400 ring-4 ring-pink-300/80 shadow-lg scale-[1.01]'
                   : 'bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white border-pink-400 ring-4 ring-pink-300/80 shadow-lg scale-[1.01] animate-pulse'
-                : 'bg-gradient-to-r from-pink-50 via-white to-rose-50 hover:from-pink-100 hover:to-rose-100 text-stone-800 border-pink-300 hover:border-pink-400 hover:shadow-lg'
+                : 'bg-gradient-to-r from-pink-50 via-white to-rose-50 hover:from-pink-100 hover:to-rose-100 text-stone-800 border-pink-300 hover:border-pink-400'
             }`}
             title={
               isContinuousRepeat
@@ -1273,32 +1155,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }
           >
             <div
-              className={`p-2 rounded-xl transition-transform shrink-0 ${
+              className={`p-1.5 sm:p-2 rounded-xl transition-transform shrink-0 ${
                 isContinuousRepeat
-                  ? 'bg-white text-pink-600 shadow-md scale-110'
+                  ? 'bg-white text-pink-600 shadow-md scale-105'
                   : 'bg-pink-500 text-white shadow-xs'
               }`}
             >
               {isContinuousRepeat ? (
                 repeatPhase === 'speaking' ? (
-                  <Volume2 className="animate-bounce" size={17} />
+                  <Volume2 className="animate-bounce" size={16} />
                 ) : (
-                  <Mic className="animate-bounce" size={17} />
+                  <Mic className="animate-bounce" size={16} />
                 )
               ) : (
-                <RotateCcw size={17} />
+                <RotateCcw size={16} />
               )}
             </div>
-            <div className="flex flex-col text-left leading-tight min-w-0">
+            <div className="flex flex-col text-left leading-tight min-w-0 flex-1">
               <div className="flex items-center gap-1">
-                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-wide whitespace-nowrap">
+                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-tight truncate">
                   {isContinuousRepeat
                     ? repeatPhase === 'speaking'
                       ? 'Speaking...'
                       : 'Listening...'
-                    : 'Button 1: REPEAT'}
+                    : 'REPEAT'}
                 </span>
-                <span className="text-[9px] bg-pink-100/90 text-pink-700 px-1 py-0.5 rounded font-mono font-bold">
+                <span className="text-[9px] bg-pink-100/90 text-pink-700 px-1 py-0.2 rounded font-mono font-bold shrink-0">
                   [{selectedLanguage}]
                 </span>
               </div>
@@ -1309,9 +1191,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               >
                 {isContinuousRepeat
                   ? repeatPhase === 'speaking'
-                    ? 'Hamster repeating 🐹'
+                    ? 'Hamster repeats 🐹'
                     : 'Speak anytime 🎙️'
-                  : 'Continuous Voice 🎙️'}
+                  : 'Continuous 🎙️'}
               </span>
             </div>
           </button>
@@ -1328,7 +1210,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   e.stopPropagation();
                   stopContinuousRepeat();
                 }}
-                className="ml-1 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bubble font-bold text-xs shadow-md border border-red-400 active:scale-90 transition-transform cursor-pointer select-none"
+                className="px-2.5 flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-bubble font-bold text-xs shadow-md border border-red-400 active:scale-90 transition-transform cursor-pointer select-none shrink-0"
                 title="Stop Continuous Repeat Mode"
               >
                 <Square size={11} fill="currentColor" />
@@ -1340,49 +1222,49 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             onClick={handleRepeatClick}
             title="Type text for hamster to repeat"
-            className="ml-1 px-2 flex items-center justify-center rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300 shadow-xs cursor-pointer active:scale-95 transition-transform"
+            className="w-8 sm:w-9 flex items-center justify-center rounded-2xl bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300 shadow-xs cursor-pointer active:scale-95 transition-transform shrink-0"
           >
             <Keyboard size={14} />
           </button>
         </div>
 
         {/* BUTTON 2 = ANSWER */}
-        <div className="flex-1 flex items-stretch">
+        <div className="flex-1 min-w-0 flex items-stretch gap-1">
           <button
             id="btn-action-answer"
             onClick={handleDirectAnswer}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-2.5 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none min-h-[50px] ${
               (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
-                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400 ring-4 ring-purple-300/80 shadow-lg scale-[1.02] animate-pulse'
-                : 'bg-gradient-to-r from-purple-50 via-white to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-stone-800 border-purple-300 hover:border-purple-400 hover:shadow-lg'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400 ring-4 ring-purple-300/80 shadow-lg scale-[1.01] animate-pulse'
+                : 'bg-gradient-to-r from-purple-50 via-white to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-stone-800 border-purple-300 hover:border-purple-400'
             }`}
             title="Button 2: ANSWER - Tap to ask question, hamster answers smartly with knowledge in BN/HI/EN!"
           >
             <div
-              className={`p-2 rounded-xl transition-transform shrink-0 ${
+              className={`p-1.5 sm:p-2 rounded-xl transition-transform shrink-0 ${
                 (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
-                  ? 'bg-white text-purple-700 shadow-md scale-110'
+                  ? 'bg-white text-purple-700 shadow-md scale-105'
                   : 'bg-purple-600 text-white shadow-xs'
               }`}
             >
               {isDirectListening && directVoiceMode === 'answer' ? (
-                <Mic className="animate-bounce" size={17} />
+                <Mic className="animate-bounce" size={16} />
               ) : isAnswerThinking ? (
-                <Sparkles className="animate-spin" size={17} />
+                <Sparkles className="animate-spin" size={16} />
               ) : (
-                <Bot size={17} />
+                <Bot size={16} />
               )}
             </div>
-            <div className="flex flex-col text-left leading-tight min-w-0">
+            <div className="flex flex-col text-left leading-tight min-w-0 flex-1">
               <div className="flex items-center gap-1">
-                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-wide whitespace-nowrap">
+                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-tight truncate">
                   {isDirectListening && directVoiceMode === 'answer'
                     ? 'Listening...'
                     : isAnswerThinking
                     ? 'Thinking...'
-                    : 'Button 2: ANSWER'}
+                    : 'ANSWER'}
                 </span>
-                <span className="text-[9px] bg-purple-100/90 text-purple-700 px-1 py-0.5 rounded font-mono font-bold">
+                <span className="text-[9px] bg-purple-100/90 text-purple-700 px-1 py-0.2 rounded font-mono font-bold shrink-0">
                   [{selectedLanguage}]
                 </span>
               </div>
@@ -1397,23 +1279,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   ? 'Ask question ❓'
                   : isAnswerThinking
                   ? 'Gemini AI 🐹✨'
-                  : 'Smart Q&A (BN/HI/EN) 💡'}
+                  : 'Smart Q&A 💡'}
               </span>
             </div>
           </button>
           <button
             onClick={handleChatClick}
             title="Type question for smart answer"
-            className="ml-1 px-2 flex items-center justify-center rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300 shadow-xs cursor-pointer active:scale-95 transition-transform"
+            className="w-8 sm:w-9 flex items-center justify-center rounded-2xl bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300 shadow-xs cursor-pointer active:scale-95 transition-transform shrink-0"
           >
             <Keyboard size={14} />
           </button>
         </div>
       </div>
 
-      {/* BOTTOM PET CARE & ACTIONS TOOLBAR (KEEP ALL FEATURES SAME) */}
-      <footer className="relative z-20 p-3 pt-0">
-        <div className="grid grid-cols-8 gap-1 bg-white/95 backdrop-blur-md p-1.5 rounded-3xl border border-stone-200 shadow-lg">
+      {/* BOTTOM PET CARE & ACTIONS TOOLBAR */}
+      <footer className="relative z-20 px-3 pb-2 sm:pb-3 shrink-0">
+        <div className="grid grid-cols-8 gap-1 bg-white/95 backdrop-blur-md p-1.5 rounded-3xl border border-pink-200/80 shadow-lg shadow-pink-900/5">
           {/* 1. Feed */}
           <button
             id="btn-action-feed"
@@ -1520,6 +1402,94 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
       </footer>
+
+      {/* TOUCH-FRIENDLY 3-FOOD SELECTION BOTTOM SHEET */}
+      <AnimatePresence>
+        {isQuickFoodOpen && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 bg-stone-900/40 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.96 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 320 }}
+              className="w-full max-w-md bg-white/98 backdrop-blur-md rounded-3xl border-2 border-amber-200 shadow-2xl p-4 flex flex-col gap-3"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🥣</span>
+                  <div>
+                    <h3 className="font-bubble font-bold text-stone-800 text-sm sm:text-base">
+                      Feed {pet.name}
+                    </h3>
+                    <p className="text-[11px] text-stone-500 font-bubble">Select a meal for your pet</p>
+                  </div>
+                </div>
+                <button
+                  id="btn-close-quick-food"
+                  onClick={() => setIsQuickFoodOpen(false)}
+                  className="p-1.5 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* 3 Food Cards */}
+              <div className="grid grid-cols-3 gap-2">
+                {THREE_FOODS.map((food) => {
+                  const invCount = pet.inventory[food.id] || 0;
+                  return (
+                    <button
+                      key={food.id}
+                      id={`btn-feed-${food.id}`}
+                      onClick={() => handleSelectFood(food)}
+                      className={`flex flex-col items-center justify-between p-2.5 rounded-2xl border-2 ${food.borderColor} ${food.colorBg} active:scale-95 transition-all text-left shadow-xs cursor-pointer min-h-[114px]`}
+                    >
+                      <div className="w-full flex justify-between items-start">
+                        <span className="text-2xl sm:text-3xl">{food.icon}</span>
+                        <span className="text-[9px] font-bold font-bubble text-amber-900 bg-white/90 px-1.5 py-0.5 rounded-full border border-amber-200 shadow-xs">
+                          {food.tag}
+                        </span>
+                      </div>
+                      <div className="w-full mt-1.5">
+                        <span className="block font-bubble font-bold text-stone-900 text-xs truncate">
+                          {food.name}
+                        </span>
+                        <div className="flex items-center gap-1 text-[10px] font-bold font-bubble text-emerald-700 mt-0.5">
+                          <span>+{food.hungerBoost} 🍖</span>
+                          <span className="text-amber-700">+{food.energyBoost} ⚡</span>
+                        </div>
+                      </div>
+                      <div className="w-full flex justify-between items-center text-[10px] font-bubble font-bold text-stone-500 mt-1 pt-1 border-t border-stone-200/60">
+                        <span>Owned: {invCount}</span>
+                        <span className="text-amber-700 font-extrabold">Feed ➔</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Footer CTA to open full pantry */}
+              <div className="flex justify-between items-center pt-2 border-t border-stone-100">
+                <span className="text-[11px] text-stone-500 font-medium pl-1">
+                  Want more variety?
+                </span>
+                <button
+                  id="btn-open-full-pantry"
+                  onClick={() => {
+                    setIsQuickFoodOpen(false);
+                    onOpenFeed();
+                  }}
+                  className="flex items-center gap-1 text-xs font-bubble font-bold text-amber-700 hover:text-amber-800 bg-amber-100/70 hover:bg-amber-100 px-3 py-1.5 rounded-full border border-amber-300/70 active:scale-95 transition-all cursor-pointer"
+                >
+                  <span>All Foods Pantry 🎒</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Hamster Talking (Repeat & Chat) Modal */}
       <HamsterTalkModal

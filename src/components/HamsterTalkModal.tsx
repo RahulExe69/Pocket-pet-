@@ -378,14 +378,14 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
                     setActiveTab('repeat');
                     soundManager.playPop();
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bubble font-bold text-xs transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl font-bubble font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === 'repeat'
                       ? 'bg-white text-pink-600 shadow-md scale-102'
                       : 'text-pink-100 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <RotateCcw size={14} />
-                  <span>Button 1: REPEAT</span>
+                  <RotateCcw size={13} />
+                  <span>Repeat</span>
                 </button>
 
                 {/* Tab 2: ANSWER */}
@@ -396,14 +396,14 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
                     setActiveTab('chat');
                     soundManager.playPop();
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bubble font-bold text-xs transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl font-bubble font-bold text-xs transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === 'chat'
                       ? 'bg-white text-purple-700 shadow-md scale-102'
                       : 'text-pink-100 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  <Bot size={14} />
-                  <span>Button 2: ANSWER</span>
+                  <Bot size={13} />
+                  <span>Smart Q&A</span>
                 </button>
               </div>
 

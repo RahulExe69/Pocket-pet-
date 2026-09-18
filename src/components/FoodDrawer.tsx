@@ -66,7 +66,7 @@ export const FoodDrawer: React.FC<FoodDrawerProps> = ({
             </div>
 
             {/* Food Grid */}
-            <div className="grid grid-cols-2 gap-3 py-4 overflow-y-auto no-scrollbar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 py-3 overflow-y-auto no-scrollbar">
               {FOOD_CATALOG.map((food) => {
                 const count = inventory[food.id] || 0;
                 const isFavorite = food.favoriteFor?.includes(petType);

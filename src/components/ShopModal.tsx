@@ -104,9 +104,9 @@ export const ShopModal: React.FC<ShopModalProps> = ({
             </div>
 
             {/* Item Catalog Grid */}
-            <div className="flex-1 overflow-y-auto no-scrollbar py-3 min-h-[300px]">
+            <div className="flex-1 overflow-y-auto no-scrollbar py-3 min-h-[280px]">
               {activeCategory === 'food' ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   {FOOD_CATALOG.map((food) => {
                     const isLocked = food.levelRequired > petLevel;
                     const canAfford = coins >= food.price;
