@@ -40,6 +40,11 @@ function safeRemoveItem(key: string): void {
   memoryStore.delete(key);
 }
 
+export function generateUniquePetId(): string {
+  const num = Math.floor(1000 + Math.random() * 9000);
+  return `HAM-${num}`;
+}
+
 export function sanitizePetState(raw: unknown): PetState {
   if (!raw || typeof raw !== 'object') {
     return { ...INITIAL_PET_STATE };
@@ -114,8 +119,12 @@ export function sanitizePetState(raw: unknown): PetState {
     accessory: typeof rawCustomization.accessory === 'string' ? rawCustomization.accessory : undefined,
   };
 
+  const petId = (typeof data.id === 'string' && data.id && data.id !== 'pet_default')
+    ? data.id
+    : generateUniquePetId();
+
   return {
-    id: typeof data.id === 'string' ? data.id : INITIAL_PET_STATE.id,
+    id: petId,
     name: typeof data.name === 'string' && data.name.trim() ? data.name.trim() : INITIAL_PET_STATE.name,
     type,
     level: typeof data.level === 'number' && !isNaN(data.level) && data.level >= 1 ? data.level : 1,

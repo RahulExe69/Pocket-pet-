@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Gift, Sparkles, ShoppingBag, Shirt, X, ChevronRight } from 'lucide-react';
-import { PetState, PetMood, FoodItem } from '../types';
+import { Settings, Gift, Sparkles, ShoppingBag, Shirt, X, ChevronRight, Users, Gamepad2, Mic, MessageCircle, RotateCcw, Volume2 } from 'lucide-react';
+import { PetState, PetMood, FoodItem, MultiplayerRoom, MultiplayerPlayer, MultiplayerMiniGameType } from '../types';
 import { PetScene3D } from './3d/PetScene3D';
 import { SpeechBubble } from './SpeechBubble';
+import { HamsterTalkModal } from './HamsterTalkModal';
+import { TalkingLanguage, SUPPORTED_LANGUAGES, speakHamsterVoice } from '../utils/speech';
 import { soundManager } from '../utils/audio';
 
 interface HomeScreenProps {
@@ -21,11 +23,19 @@ interface HomeScreenProps {
   onOpenDailyRewards: () => void;
   onOpenSettings: () => void;
   onFeedItem?: (food: FoodItem) => void;
+  onDance?: () => void;
+  onSing?: () => void;
   feedTriggerProp?: { foodId: string; timestamp: number } | null;
   waterTriggerProp?: { timestamp: number } | null;
   customSpeechMessage?: string | null;
   dailyRewardAvailable?: boolean;
   isCleanOpen?: boolean;
+  onOpenMultiplayer?: () => void;
+  onOpenMiniGames?: () => void;
+  currentRoom?: MultiplayerRoom | null;
+  friendPet?: MultiplayerPlayer | null;
+  onTapFloorMove?: (pos: { x: number; z: number }) => void;
+  activeGame?: MultiplayerMiniGameType | null;
 }
 
 // 3 Distinct Foods for Feeding the Hamster
@@ -91,16 +101,103 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenDailyRewards,
   onOpenSettings,
   onFeedItem,
+  onDance,
+  onSing,
   feedTriggerProp,
   waterTriggerProp,
   customSpeechMessage,
   dailyRewardAvailable = false,
   isCleanOpen = false,
+  onOpenMultiplayer,
+  onOpenMiniGames,
+  currentRoom = null,
+  friendPet = null,
+  onTapFloorMove,
+  activeGame = null,
 }) => {
   const [isDrinking, setIsDrinking] = useState<boolean>(false);
+  const [isDancing, setIsDancing] = useState<boolean>(false);
+  const [isSinging, setIsSinging] = useState<boolean>(false);
   const [isQuickFoodOpen, setIsQuickFoodOpen] = useState<boolean>(false);
   const [feedTrigger, setFeedTrigger] = useState<{ foodId: string; timestamp: number } | null>(null);
   const [waterTrigger, setWaterTrigger] = useState<{ timestamp: number } | null>(null);
+  const [danceTrigger, setDanceTrigger] = useState<{ timestamp: number } | null>(null);
+  const [singTrigger, setSingTrigger] = useState<{ timestamp: number } | null>(null);
+  const [petIdCopied, setPetIdCopied] = useState<boolean>(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<TalkingLanguage>('EN');
+  const [talkingModalMode, setTalkingModalMode] = useState<'repeat' | 'chat' | null>(null);
+  const [isTalking, setIsTalking] = useState<boolean>(false);
+  const [localSpeechMessage, setLocalSpeechMessage] = useState<string | null>(null);
+  const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Hamster high-pitched voice speech handler with animated mouth & bubble
+  const handleHamsterSpeak = (text: string, lang: TalkingLanguage, userTextFirst?: string) => {
+    if (speechTimeoutRef.current) {
+      clearTimeout(speechTimeoutRef.current);
+      speechTimeoutRef.current = null;
+    }
+
+    if (userTextFirst) {
+      // 1) Show user text in speech bubble first!
+      setLocalSpeechMessage(`You: "${userTextFirst}"`);
+      speechTimeoutRef.current = setTimeout(() => {
+        // 2) Hamster repeats same in cute high pitch 1.6 with mouth open animation and speechSynthesis
+        setLocalSpeechMessage(`"${text}"`);
+        setIsTalking(true);
+
+        speakHamsterVoice(text, lang, {
+          onStart: () => {
+            setIsTalking(true);
+          },
+          onEnd: () => {
+            setIsTalking(false);
+            speechTimeoutRef.current = setTimeout(() => {
+              setLocalSpeechMessage(null);
+            }, 5000);
+          },
+          onError: () => {
+            setIsTalking(false);
+          },
+        });
+      }, 1200);
+    } else {
+      setLocalSpeechMessage(text);
+      setIsTalking(true);
+
+      speakHamsterVoice(text, lang, {
+        onStart: () => {
+          setIsTalking(true);
+        },
+        onEnd: () => {
+          setIsTalking(false);
+          speechTimeoutRef.current = setTimeout(() => {
+            setLocalSpeechMessage(null);
+          }, 5000);
+        },
+        onError: () => {
+          setIsTalking(false);
+        },
+      });
+    }
+  };
+
+  const handleLanguageSelect = (lang: TalkingLanguage) => {
+    setSelectedLanguage(lang);
+    soundManager.playPop();
+    const greeting = SUPPORTED_LANGUAGES[lang].defaultGreeting;
+    handleHamsterSpeak(greeting, lang);
+  };
+
+  const handleRepeatClick = () => {
+    soundManager.playPop();
+    setTalkingModalMode('repeat');
+  };
+
+  const handleChatClick = () => {
+    soundManager.playPop();
+    setTalkingModalMode('chat');
+  };
+
   const [statNotice, setStatNotice] = useState<{
     text: string;
     hunger: number;
@@ -178,6 +275,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
     setTimeout(() => setIsDrinking(false), 2200);
     setTimeout(() => setStatNotice(null), 2500);
+  };
+
+  // Handle Dance Action
+  const handleDanceClick = () => {
+    if (pet.isSleeping && onToggleSleep) {
+      onToggleSleep();
+    }
+    const trigger = { timestamp: Date.now() };
+    setDanceTrigger(trigger);
+    setIsDancing(true);
+    setIsSinging(false);
+    if (onDance) onDance();
+    setStatNotice({
+      icon: '💃',
+      text: `${pet.name} is dancing with music & spins! 🎶`,
+      hunger: 0,
+      energy: 15,
+    });
+    setTimeout(() => setStatNotice(null), 3000);
+  };
+
+  // Handle Sing Action
+  const handleSingClick = () => {
+    if (pet.isSleeping && onToggleSleep) {
+      onToggleSleep();
+    }
+    const trigger = { timestamp: Date.now() };
+    setSingTrigger(trigger);
+    setIsSinging(true);
+    setIsDancing(false);
+    if (onSing) onSing();
+    setStatNotice({
+      icon: '🎤',
+      text: `${pet.name} is singing a cute song! 🎵`,
+      hunger: 0,
+      energy: 15,
+    });
+    setTimeout(() => setStatNotice(null), 3000);
   };
 
   // Wallpapers style map for framing backdrop
@@ -314,6 +449,92 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </header>
 
+      {/* MULTIPLAYER & UNIQUE PET ID BAR (Top) */}
+      <div className="relative z-20 px-2.5 sm:px-3 -mt-1 mb-1.5 flex items-center justify-between gap-1.5 flex-wrap">
+        {/* Unique Pet ID for Each User (Shown at top) */}
+        <button
+          id="pet-id-top-display"
+          onClick={() => {
+            if (navigator.clipboard && pet.id) {
+              navigator.clipboard.writeText(pet.id);
+              setPetIdCopied(true);
+              soundManager.playPop();
+              setTimeout(() => setPetIdCopied(false), 2000);
+            }
+          }}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-2xl border shadow-xs font-bubble text-xs cursor-pointer active:scale-95 transition-all ${
+            pet.isSleeping
+              ? 'bg-slate-800/90 border-slate-700 text-pink-300 hover:bg-slate-700/90'
+              : 'bg-white/95 border-pink-200 text-pink-800 hover:bg-pink-50'
+          }`}
+          title="Click to copy your Unique Pet ID"
+        >
+          <span className="text-xs">🏷️</span>
+          <span className="font-bold">Pet ID:</span>
+          <span className="font-mono font-extrabold text-pink-950 bg-pink-50 px-1.5 py-0.5 rounded-lg border border-pink-200 text-[11px] tracking-wider">
+            {pet.id || 'HAM-8821'}
+          </span>
+          {petIdCopied && (
+            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200 animate-fade-in">
+              Copied! ✨
+            </span>
+          )}
+        </button>
+
+        {/* 3 Top Language Buttons: [BN] [HI] [EN] */}
+        <div
+          id="top-language-selector"
+          className="flex items-center bg-white/95 backdrop-blur-xs rounded-2xl border border-pink-200 p-0.5 shadow-xs font-bubble text-xs"
+          title="Select Talking Language"
+        >
+          {(['BN', 'HI', 'EN'] as TalkingLanguage[]).map((lang) => (
+            <button
+              key={lang}
+              id={`btn-top-lang-${lang.toLowerCase()}`}
+              onClick={() => handleLanguageSelect(lang)}
+              className={`px-2 py-0.5 rounded-xl font-bold transition-all cursor-pointer ${
+                selectedLanguage === lang
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xs scale-105'
+                  : 'text-stone-600 hover:text-pink-600 hover:bg-pink-50'
+              }`}
+            >
+              [{lang}]
+            </button>
+          ))}
+        </div>
+
+        {/* Multiplayer & Mini-Games Action Buttons */}
+        <div className="flex items-center gap-1.5">
+          {/* Multiplayer Room Button */}
+          <button
+            id="btn-open-multiplayer"
+            onClick={onOpenMultiplayer}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-2xl border shadow-xs transition-all active:scale-95 font-bubble text-xs font-bold cursor-pointer ${
+              currentRoom
+                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400 ring-2 ring-pink-300 shadow-md'
+                : 'bg-white/95 border-pink-300 text-pink-700 hover:bg-pink-50'
+            }`}
+          >
+            <Users size={13} />
+            <span>{currentRoom ? `Room #${currentRoom.code}` : 'Multiplayer'}</span>
+            {currentRoom?.guest && (
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+            )}
+          </button>
+
+          {/* Mini-Games Button (Race, Hide & Seek, Ball Play) */}
+          <button
+            id="btn-open-multiplayer-minigames"
+            onClick={onOpenMiniGames}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white border border-purple-400 shadow-xs font-bubble text-xs font-bold hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            title="Mini-Games: Race, Hide & Seek, Ball Play"
+          >
+            <Gamepad2 size={13} />
+            <span>Mini-Games</span>
+          </button>
+        </div>
+      </div>
+
       {/* METERS STATUS BAR */}
       <div className="relative z-20 px-3">
         <div
@@ -424,16 +645,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           onToggleSleep={onToggleSleep}
           feedTrigger={feedTrigger}
           waterTrigger={waterTrigger}
+          danceTrigger={danceTrigger}
+          singTrigger={singTrigger}
+          onDanceComplete={() => setIsDancing(false)}
+          onSingComplete={() => setIsSinging(false)}
           isBathing={isCleanOpen}
           interactive={!pet.isSleeping}
+          friendPet={friendPet}
+          onTapFloorMove={onTapFloorMove}
+          activeGame={activeGame}
+          isTalking={isTalking}
         />
+
+        {/* Friend In-Room Presence Banner */}
+        {friendPet && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-3.5 py-1 rounded-full border border-pink-300 shadow-md pointer-events-none">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+            <span className="text-xs font-bubble font-bold text-pink-800 whitespace-nowrap">
+              Friend <span className="text-pink-900 font-extrabold">{friendPet.petName}</span> is in the room! 💖
+            </span>
+            {activeGame && (
+              <span className="text-[10px] bg-pink-100 text-pink-900 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                {activeGame}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Floating Speech Bubble Above 3D Pet */}
         <div className="absolute top-2 left-0 right-0 pointer-events-none z-20 flex justify-center px-4">
           <div className="pointer-events-auto max-w-[280px]">
             <SpeechBubble
               mood={mood}
-              customMessage={customSpeechMessage}
+              customMessage={localSpeechMessage || customSpeechMessage}
               onBubbleClick={onPetClick}
             />
           </div>
@@ -589,6 +833,94 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         )}
       </AnimatePresence>
 
+      {/* 2 TALKING ACTION BUTTONS: REPEAT (TAB 1) & CHAT GPT (TAB 2) */}
+      <div className="relative z-20 px-3 pt-0 pb-1 flex items-center justify-center gap-2">
+        {/* 1) Repeat Button (Tab 1) */}
+        <button
+          id="btn-action-repeat"
+          onClick={handleRepeatClick}
+          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer bg-gradient-to-r from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 text-stone-800 border-pink-300 hover:border-pink-400 hover:shadow-md group"
+          title="Hold big mic to speak, hamster repeats same in cute high pitch 1.6!"
+        >
+          <div className="p-1.5 rounded-xl bg-pink-500 text-white shadow-xs group-hover:scale-110 transition-transform">
+            <RotateCcw size={15} />
+          </div>
+          <div className="flex flex-col text-left leading-tight">
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-bold font-bubble">Repeat</span>
+              <span className="text-[9px] bg-pink-100 text-pink-700 px-1 rounded-sm font-mono font-bold">
+                [{selectedLanguage}]
+              </span>
+            </div>
+            <span className="text-[10px] font-bubble text-pink-600">Voice Mimic 🎙️</span>
+          </div>
+        </button>
+
+        {/* 2) Chat GPT Button (Tab 2) */}
+        <button
+          id="btn-action-chatgpt"
+          onClick={handleChatClick}
+          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-stone-800 border-purple-300 hover:border-purple-400 hover:shadow-md group"
+          title="ChatGPT-like AI Friend: Ask questions in BN, HI, EN, get smart cute voice answers!"
+        >
+          <div className="p-1.5 rounded-xl bg-purple-600 text-white shadow-xs group-hover:scale-110 transition-transform">
+            <MessageCircle size={15} />
+          </div>
+          <div className="flex flex-col text-left leading-tight">
+            <div className="flex items-center gap-1">
+              <span className="text-xs font-bold font-bubble">Chat GPT</span>
+              <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded-sm font-mono font-bold">
+                [{selectedLanguage}]
+              </span>
+            </div>
+            <span className="text-[10px] font-bubble text-purple-600">AI Friend 🤖💬</span>
+          </div>
+        </button>
+      </div>
+
+      {/* 2 TALENT ACTION BUTTONS: DANCE & SING */}
+      <div className="relative z-20 px-3 pt-0 pb-1 flex items-center justify-center gap-2">
+        {/* Dance Button */}
+        <button
+          id="btn-action-dance"
+          onClick={handleDanceClick}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer ${
+            isDancing
+              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400 ring-2 ring-pink-300 shadow-md animate-pulse'
+              : 'bg-white/90 backdrop-blur-md text-stone-800 border-pink-200/80 hover:bg-pink-50 hover:border-pink-300'
+          }`}
+          title="Make hamster dance with music and spins!"
+        >
+          <span className="text-xl">💃</span>
+          <div className="flex flex-col text-left leading-tight">
+            <span className="text-xs font-bold font-bubble">Dance</span>
+            <span className={`text-[10px] font-bubble ${isDancing ? 'text-pink-100 font-bold' : 'text-pink-600'}`}>
+              {isDancing ? 'Grooving! 🎶' : 'Music & Spins 🎶'}
+            </span>
+          </div>
+        </button>
+
+        {/* Sing Button */}
+        <button
+          id="btn-action-sing"
+          onClick={handleSingClick}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer ${
+            isSinging
+              ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-purple-400 ring-2 ring-purple-300 shadow-md animate-pulse'
+              : 'bg-white/90 backdrop-blur-md text-stone-800 border-purple-200/80 hover:bg-purple-50 hover:border-purple-300'
+          }`}
+          title="Make hamster sing cute song with mouth animation & notes!"
+        >
+          <span className="text-xl">🎤</span>
+          <div className="flex flex-col text-left leading-tight">
+            <span className="text-xs font-bold font-bubble">Sing</span>
+            <span className={`text-[10px] font-bubble ${isSinging ? 'text-purple-100 font-bold' : 'text-purple-600'}`}>
+              {isSinging ? 'Singing! 🎵' : 'Cute Melody 🎵'}
+            </span>
+          </div>
+        </button>
+      </div>
+
       {/* BOTTOM ACTION BUTTONS TOOLBAR */}
       <footer className="relative z-20 p-3 pt-1">
         <div className="grid grid-cols-6 gap-1.5 bg-white/95 backdrop-blur-md p-2 rounded-3xl border border-stone-200 shadow-lg">
@@ -666,6 +998,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </button>
         </div>
       </footer>
+
+      {/* Hamster Talking (Repeat & Chat) Modal */}
+      <HamsterTalkModal
+        mode={talkingModalMode}
+        isOpen={talkingModalMode !== null}
+        onClose={() => setTalkingModalMode(null)}
+        petName={pet.name}
+        selectedLanguage={selectedLanguage}
+        onSelectLanguage={(lang) => {
+          setSelectedLanguage(lang);
+        }}
+        onHamsterSpeak={handleHamsterSpeak}
+      />
     </div>
   );
 };

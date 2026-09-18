@@ -86,6 +86,30 @@ export interface ShopItem {
 
 export type MiniGameType = 'food-catch' | 'memory-match' | 'bubble-pop' | 'pet-runner';
 
+export type MultiplayerMiniGameType = 'race' | 'hide-and-seek' | 'ball-play';
+
+export interface MultiplayerPlayer {
+  petId: string;
+  petName: string;
+  petType: PetType;
+  customization?: PetCustomization;
+  position: { x: number; z: number };
+  targetPosition?: { x: number; z: number };
+  action: 'idle' | 'walking' | 'dance' | 'sing' | 'happy' | 'game';
+  score?: number;
+  lastPing: number;
+  isBot?: boolean;
+}
+
+export interface MultiplayerRoom {
+  code: string; // 6-digit room code e.g. "849201"
+  createdAt: number;
+  host: MultiplayerPlayer;
+  guest: MultiplayerPlayer | null;
+  activeGame: 'none' | MultiplayerMiniGameType;
+  gameData?: any;
+}
+
 export interface DailyReward {
   day: number;
   coins: number;

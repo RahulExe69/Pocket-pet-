@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
-import { PetState, PetMood } from '../../types';
+import { PetState, PetMood, MultiplayerPlayer, MultiplayerMiniGameType } from '../../types';
 import { buildPetModel, PetNodes, buildCustomizationItems } from './petGeometries';
 import { buildRoomEnvironment, RoomNodes, populateFoodBowl } from './roomGeometries';
 import { PetParticleSystem } from './petParticleSystem';
+import { createPetNameTagSprite, createHamsterPlayBall } from './threeHelpers';
 import { soundManager } from '../../utils/audio';
 import { RotateCw, ZoomIn, Eye, Sparkles } from 'lucide-react';
 
@@ -14,7 +15,9 @@ export type AnimationState =
   | 'drinking'
   | 'sleeping'
   | 'happy'
-  | 'bathing';
+  | 'bathing'
+  | 'dance'
+  | 'sing';
 
 export interface FeedTriggerData {
   foodId: string;
@@ -34,11 +37,19 @@ interface PetScene3DProps {
   onToggleSleep?: () => void;
   feedTrigger?: FeedTriggerData | null;
   waterTrigger?: WaterTriggerData | null;
+  danceTrigger?: { timestamp: number } | null;
+  singTrigger?: { timestamp: number } | null;
   onEatingComplete?: () => void;
   onDrinkingComplete?: () => void;
+  onDanceComplete?: () => void;
+  onSingComplete?: () => void;
   isBathing?: boolean;
   cleanProgress?: number;
   interactive?: boolean;
+  friendPet?: MultiplayerPlayer | null;
+  onTapFloorMove?: (pos: { x: number; z: number }) => void;
+  activeGame?: MultiplayerMiniGameType | null;
+  isTalking?: boolean;
 }
 
 export const PetScene3D: React.FC<PetScene3DProps> = ({
@@ -50,11 +61,19 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   onToggleSleep,
   feedTrigger,
   waterTrigger,
+  danceTrigger,
+  singTrigger,
   onEatingComplete,
   onDrinkingComplete,
+  onDanceComplete,
+  onSingComplete,
   isBathing = false,
   cleanProgress = 0,
   interactive = true,
+  friendPet = null,
+  onTapFloorMove,
+  activeGame = null,
+  isTalking = false,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -64,6 +83,15 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   const petNodesRef = useRef<PetNodes | null>(null);
   const roomNodesRef = useRef<RoomNodes | null>(null);
   const particlesRef = useRef<PetParticleSystem | null>(null);
+
+  // Friend Hamster 3D Refs (Multiplayer in same pink room)
+  const friendNodesRef = useRef<PetNodes | null>(null);
+  const friendCurrentPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0.8, 0, 0.4));
+  const friendTargetPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0.8, 0, 0.4));
+  const friendHeadingRef = useRef<number>(0);
+  const friendNameTagRef = useRef<THREE.Sprite | null>(null);
+  const playerNameTagRef = useRef<THREE.Sprite | null>(null);
+  const ballGroupRef = useRef<THREE.Group | null>(null);
 
   // Animation controller refs
   const animStateRef = useRef<AnimationState>('idle');
@@ -77,10 +105,14 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   const activeIntentRef = useRef<'none' | 'food' | 'water'>('none');
 
   // Stable callbacks container for animation loop
-  const callbacksRef = useRef({ onEatingComplete, onDrinkingComplete });
+  const callbacksRef = useRef({ onEatingComplete, onDrinkingComplete, onDanceComplete, onSingComplete });
   useEffect(() => {
-    callbacksRef.current = { onEatingComplete, onDrinkingComplete };
+    callbacksRef.current = { onEatingComplete, onDrinkingComplete, onDanceComplete, onSingComplete };
   });
+
+  // Floor target marker ref
+  const floorMarkerRef = useRef<{ ring: THREE.Mesh; dot: THREE.Mesh; life: number } | null>(null);
+  const lastNoteSpawnTimeRef = useRef<number>(0);
 
   // Camera Orbit State
   const cameraAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
@@ -143,6 +175,43 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     animTimeRef.current = 0;
   }, []);
 
+  // Trigger dancing animation (music, spins, groove)
+  const triggerDanceAnimation = useCallback(() => {
+    if (animStateRef.current === 'sleeping') {
+      animStateRef.current = 'idle';
+    }
+    soundManager.stopAllMusic();
+    soundManager.playDanceMusic();
+    animStateRef.current = 'dance';
+    animTimeRef.current = 0;
+    isWalkingRef.current = false;
+    if (particlesRef.current && petNodesRef.current) {
+      particlesRef.current.spawnDanceSparkles(
+        petNodesRef.current.root.position.clone().add(new THREE.Vector3(0, 0.4, 0)),
+        8
+      );
+    }
+  }, []);
+
+  // Trigger singing animation (song, mouth movement, music notes)
+  const triggerSingAnimation = useCallback(() => {
+    if (animStateRef.current === 'sleeping') {
+      animStateRef.current = 'idle';
+    }
+    soundManager.stopAllMusic();
+    soundManager.playSingSong();
+    animStateRef.current = 'sing';
+    animTimeRef.current = 0;
+    isWalkingRef.current = false;
+    lastNoteSpawnTimeRef.current = 0;
+    if (particlesRef.current && petNodesRef.current) {
+      particlesRef.current.spawnMusicNotes(
+        petNodesRef.current.root.position.clone().add(new THREE.Vector3(0, 0.95, 0.2)),
+        2
+      );
+    }
+  }, []);
+
   // Watch external Feed Trigger (from UI buttons or drawers)
   useEffect(() => {
     if (!feedTrigger || !roomNodesRef.current) return;
@@ -154,6 +223,32 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     if (!waterTrigger || !roomNodesRef.current) return;
     triggerDrinkAnimation();
   }, [waterTrigger, triggerDrinkAnimation]);
+
+  // Watch external Dance Trigger
+  useEffect(() => {
+    if (!danceTrigger) return;
+    triggerDanceAnimation();
+  }, [danceTrigger, triggerDanceAnimation]);
+
+  // Watch external Sing Trigger
+  useEffect(() => {
+    if (!singTrigger) return;
+    triggerSingAnimation();
+  }, [singTrigger, triggerSingAnimation]);
+
+  // Watch isTalking state to control mouth animation and posture reset
+  const isTalkingRef = useRef<boolean>(false);
+  useEffect(() => {
+    isTalkingRef.current = !!isTalking;
+    if (!isTalking && petNodesRef.current) {
+      petNodesRef.current.mouthGroup.scale.set(0.9, 0.22, 0.7);
+      petNodesRef.current.mouthGroup.position.set(0, 0.022, 0.636);
+      petNodesRef.current.cheeksGroup.scale.set(1, 1, 1);
+      petNodesRef.current.leftArm.rotation.set(0, 0, 0);
+      petNodesRef.current.rightArm.rotation.set(0, 0, 0);
+      petNodesRef.current.headGroup.rotation.set(0, 0, 0);
+    }
+  }, [isTalking]);
 
   // Camera presets
   const handleCameraPreset = (mode: 'front' | 'angled' | 'top') => {
@@ -225,6 +320,83 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     }
   }, [isBathing, cleanProgress]);
 
+  // Sync friend hamster 3D model and name tag in the pink room
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+
+    if (friendPet) {
+      if (!friendNodesRef.current || friendNodesRef.current.root.userData.petId !== friendPet.petId) {
+        if (friendNodesRef.current) {
+          scene.remove(friendNodesRef.current.root);
+          friendNodesRef.current = null;
+        }
+
+        const fNodes = buildPetModel(friendPet.petType || 'hamster', friendPet.customization || { accessory: 'bow-pink' });
+        fNodes.root.userData.petId = friendPet.petId;
+        friendNodesRef.current = fNodes;
+
+        const spawnPos = new THREE.Vector3(friendPet.position?.x ?? 0.8, 0, friendPet.position?.z ?? 0.4);
+        friendCurrentPosRef.current.copy(spawnPos);
+        friendTargetPosRef.current.copy(spawnPos);
+        fNodes.root.position.copy(spawnPos);
+
+        // Add 3D Billboard Name Tag for friend's hamster
+        const friendTag = createPetNameTagSprite(friendPet.petName, friendPet.petId, true);
+        friendNameTagRef.current = friendTag;
+        fNodes.root.add(friendTag);
+
+        scene.add(fNodes.root);
+
+        // Add host's name tag if not present
+        if (petNodesRef.current && !playerNameTagRef.current) {
+          const playerTag = createPetNameTagSprite(pet.name, pet.id, false);
+          playerNameTagRef.current = playerTag;
+          petNodesRef.current.root.add(playerTag);
+        }
+      }
+    } else {
+      if (friendNodesRef.current) {
+        scene.remove(friendNodesRef.current.root);
+        friendNodesRef.current = null;
+      }
+      if (playerNameTagRef.current && petNodesRef.current) {
+        petNodesRef.current.root.remove(playerNameTagRef.current);
+        playerNameTagRef.current = null;
+      }
+    }
+  }, [friendPet?.petId, friendPet?.petName, friendPet?.petType, pet.name, pet.id]);
+
+  // Sync friend target position
+  useEffect(() => {
+    if (!friendPet) return;
+    if (friendPet.targetPosition) {
+      friendTargetPosRef.current.set(friendPet.targetPosition.x, 0, friendPet.targetPosition.z);
+    } else if (friendPet.position) {
+      friendTargetPosRef.current.set(friendPet.position.x, 0, friendPet.position.z);
+    }
+  }, [friendPet?.position?.x, friendPet?.position?.z, friendPet?.targetPosition?.x, friendPet?.targetPosition?.z]);
+
+  // Sync Ball Play 3D toy ball
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+
+    if (activeGame === 'ball-play') {
+      if (!ballGroupRef.current) {
+        const ball = createHamsterPlayBall();
+        ball.position.set(0, 0, 0);
+        ballGroupRef.current = ball;
+        scene.add(ball);
+      }
+    } else {
+      if (ballGroupRef.current) {
+        scene.remove(ballGroupRef.current);
+        ballGroupRef.current = null;
+      }
+    }
+  }, [activeGame]);
+
   // Main Three.js Setup & Animation Loop
   useEffect(() => {
     const container = containerRef.current;
@@ -280,7 +452,38 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     particlesRef.current = particles;
     scene.add(particles.group);
 
-    // 7. Raycaster for clicking 3D objects
+    // 7. Floor tap destination indicator marker (pulse ring + inner dot)
+    const markerGroup = new THREE.Group();
+    const ringGeo = new THREE.RingGeometry(0.14, 0.22, 28);
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xf59e0b,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.position.y = 0.015;
+
+    const dotGeo = new THREE.CircleGeometry(0.07, 20);
+    dotGeo.rotateX(-Math.PI / 2);
+    const dotMat = new THREE.MeshBasicMaterial({
+      color: 0xfbbf24,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const dotMesh = new THREE.Mesh(dotGeo, dotMat);
+    dotMesh.position.y = 0.016;
+
+    markerGroup.add(ringMesh);
+    markerGroup.add(dotMesh);
+    scene.add(markerGroup);
+    floorMarkerRef.current = { ring: ringMesh, dot: dotMesh, life: 0 };
+
+    // 8. Raycaster for clicking 3D objects and tap-to-move
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -288,6 +491,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     const onPointerDown = (e: PointerEvent) => {
       isDraggingRef.current = true;
       hasMovedPointerRef.current = false;
+      startPointerRef.current = { x: e.clientX, y: e.clientY };
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
     };
 
@@ -296,7 +500,11 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       const dx = e.clientX - lastPointerRef.current.x;
       const dy = e.clientY - lastPointerRef.current.y;
 
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      const totalDist = Math.hypot(
+        e.clientX - startPointerRef.current.x,
+        e.clientY - startPointerRef.current.y
+      );
+      if (totalDist > 9) {
         hasMovedPointerRef.current = true;
       }
 
@@ -307,7 +515,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         Math.min(0.95, targetAngleRef.current.phi + dy * 0.005)
       );
 
-      // Clamp theta so player stays within pleasant room viewing cone (-0.8 to +0.8 rad)
+      // Clamp theta so player stays within pleasant room viewing cone (-0.85 to +0.85 rad)
       targetAngleRef.current.theta = Math.max(-0.85, Math.min(0.85, targetAngleRef.current.theta));
 
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -316,7 +524,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     const onPointerUp = (e: PointerEvent) => {
       isDraggingRef.current = false;
 
-      // If user tapped without dragging, raycast to click pet or room objects
+      // If user tapped without dragging, raycast to interact or walk
       if (!hasMovedPointerRef.current && interactive) {
         const rect = container.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -331,7 +539,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
             triggerHappyAnimation();
             onPetClick();
           } else {
-            // Wake up if tapped bed
+            // Wake up if tapped pet in bed
             if (onToggleSleep) onToggleSleep();
           }
           return;
@@ -370,17 +578,52 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
           return;
         }
 
-        // Check if floor clicked -> pet waddles over to investigated tap
+        // 1) Tap to Move anywhere on the floor!
         const floorIntersects = raycaster.intersectObject(roomNodes.floorMesh);
-        if (floorIntersects.length > 0 && !pet.isSleeping) {
-          const pt = floorIntersects[0].point;
-          // Clamp inside playable room area
-          const targetX = Math.max(-1.8, Math.min(1.8, pt.x));
-          const targetZ = Math.max(-1.8, Math.min(1.8, pt.z));
+        let floorPoint: THREE.Vector3 | null = null;
+        if (floorIntersects.length > 0) {
+          floorPoint = floorIntersects[0].point;
+        } else {
+          // Raycast fallback to the Y=0 room floor plane
+          const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+          const hit = new THREE.Vector3();
+          if (raycaster.ray.intersectPlane(floorPlane, hit)) {
+            if (Math.abs(hit.x) <= 2.2 && Math.abs(hit.z) <= 2.2) {
+              floorPoint = hit;
+            }
+          }
+        }
+
+        if (floorPoint) {
+          // Clamp inside playable room boundary so hamster stays inside walls comfortably
+          const targetX = Math.max(-1.85, Math.min(1.85, floorPoint.x));
+          const targetZ = Math.max(-1.85, Math.min(1.85, floorPoint.z));
+
+          soundManager.stopAllMusic();
+          if (pet.isSleeping && onToggleSleep) {
+            onToggleSleep();
+          }
+
           targetPosRef.current.set(targetX, 0, targetZ);
           animStateRef.current = 'walking';
           isWalkingRef.current = true;
+          animTimeRef.current = 0;
           soundManager.playPop();
+
+          if (onTapFloorMove) {
+            onTapFloorMove({ x: targetX, z: targetZ });
+          }
+
+          // Show animated destination floor marker
+          if (floorMarkerRef.current) {
+            floorMarkerRef.current.ring.position.set(targetX, 0.015, targetZ);
+            floorMarkerRef.current.dot.position.set(targetX, 0.016, targetZ);
+            floorMarkerRef.current.ring.scale.set(1, 1, 1);
+            floorMarkerRef.current.dot.scale.set(1, 1, 1);
+            (floorMarkerRef.current.ring.material as THREE.MeshBasicMaterial).opacity = 0.9;
+            (floorMarkerRef.current.dot.material as THREE.MeshBasicMaterial).opacity = 1.0;
+            floorMarkerRef.current.life = 1.0;
+          }
         }
       }
     };
@@ -459,12 +702,26 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         }
       }
 
+      // Update floor marker animation
+      if (floorMarkerRef.current && floorMarkerRef.current.life > 0) {
+        floorMarkerRef.current.life -= delta * 0.9;
+        const pulse = 1.0 + Math.sin(t * 10) * 0.15;
+        floorMarkerRef.current.ring.scale.set(pulse, 1, pulse);
+        const opacity = Math.max(0, floorMarkerRef.current.life);
+        (floorMarkerRef.current.ring.material as THREE.MeshBasicMaterial).opacity = opacity * 0.85;
+        (floorMarkerRef.current.dot.material as THREE.MeshBasicMaterial).opacity = opacity;
+        if (floorMarkerRef.current.life <= 0) {
+          (floorMarkerRef.current.ring.material as THREE.MeshBasicMaterial).opacity = 0;
+          (floorMarkerRef.current.dot.material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+      }
+
       // Pet position interpolation & walking waddle
       const distToTarget = currentPosRef.current.distanceTo(targetPosRef.current);
 
-      if (isWalkingRef.current && distToTarget > 0.08) {
+      if (isWalkingRef.current && distToTarget > 0.06) {
         const moveDir = targetPosRef.current.clone().sub(currentPosRef.current).normalize();
-        const speed = 1.4;
+        const speed = Math.min(1.6, Math.max(0.45, distToTarget * 1.9));
         currentPosRef.current.addScaledVector(moveDir, speed * delta);
 
         // Turn towards movement direction
@@ -472,25 +729,31 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         let diff = targetAngle - currentRotYRef.current;
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
-        currentRotYRef.current += diff * 0.15;
+        currentRotYRef.current += diff * 0.22;
 
-        // Cute waddle animation
+        // Cute waddle animation with speed-adjusted tempo
         const walkFreq = 14;
         const waddleBob = Math.abs(Math.sin(t * walkFreq)) * 0.12;
         petNodes.bodyGroup.position.y = 0.55 + waddleBob;
         petNodes.bodyGroup.rotation.z = Math.sin(t * walkFreq) * 0.12;
+        petNodes.bodyGroup.rotation.x = 0.08;
 
         // Legs swinging
-        petNodes.leftLeg.rotation.x = Math.sin(t * walkFreq) * 0.6;
-        petNodes.rightLeg.rotation.x = -Math.sin(t * walkFreq) * 0.6;
+        petNodes.leftLeg.rotation.x = Math.sin(t * walkFreq) * 0.65;
+        petNodes.rightLeg.rotation.x = -Math.sin(t * walkFreq) * 0.65;
 
         // Arms swinging
-        petNodes.leftArm.rotation.x = -Math.sin(t * walkFreq) * 0.4;
-        petNodes.rightArm.rotation.x = Math.sin(t * walkFreq) * 0.4;
+        petNodes.leftArm.rotation.x = -Math.sin(t * walkFreq) * 0.45;
+        petNodes.rightArm.rotation.x = Math.sin(t * walkFreq) * 0.45;
 
         // Ear wiggles
-        petNodes.leftEar.rotation.z = Math.sin(t * walkFreq) * 0.15;
-        petNodes.rightEar.rotation.z = -Math.sin(t * walkFreq) * 0.15;
+        petNodes.leftEar.rotation.z = Math.sin(t * walkFreq) * 0.16;
+        petNodes.rightEar.rotation.z = -Math.sin(t * walkFreq) * 0.16;
+
+        // Step dust puff
+        if (t % 0.28 < 0.04) {
+          particles.spawnFootstepDust(currentPosRef.current.clone().add(new THREE.Vector3(0, 0, -0.08)));
+        }
       } else if (isWalkingRef.current) {
         // Reached destination!
         isWalkingRef.current = false;
@@ -499,6 +762,11 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         petNodes.leftArm.rotation.x = 0;
         petNodes.rightArm.rotation.x = 0;
         petNodes.bodyGroup.rotation.z = 0;
+        petNodes.bodyGroup.rotation.x = 0;
+
+        if (floorMarkerRef.current) {
+          floorMarkerRef.current.life = Math.min(floorMarkerRef.current.life, 0.2);
+        }
 
         // Check if arrived at bowl, bed, or toy
         if (targetPosRef.current.distanceTo(roomNodes.foodBowlPosition) < 0.9) {
@@ -652,27 +920,254 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
           animStateRef.current = 'idle';
           petNodes.bodyGroup.rotation.z = 0;
         }
+      } else if (state === 'dance') {
+        // Multi-phase dance choreography with music, spins, and sparkles!
+        if (t < 1.2) {
+          // Phase 1: Bouncy side-to-side groove
+          const bounce = Math.abs(Math.sin(t * 12)) * 0.16;
+          petNodes.bodyGroup.position.y = 0.55 + bounce;
+          petNodes.bodyGroup.position.x = Math.sin(t * 10) * 0.15;
+          petNodes.bodyGroup.rotation.z = Math.sin(t * 10) * 0.16;
+
+          petNodes.leftArm.rotation.x = -1.2 + Math.sin(t * 14) * 0.5;
+          petNodes.rightArm.rotation.x = -1.2 - Math.sin(t * 14) * 0.5;
+
+          petNodes.leftLeg.rotation.x = Math.sin(t * 12) * 0.4;
+          petNodes.rightLeg.rotation.x = -Math.sin(t * 12) * 0.4;
+
+          petNodes.leftEar.rotation.z = Math.sin(t * 16) * 0.35;
+          petNodes.rightEar.rotation.z = -Math.sin(t * 16) * 0.35;
+
+          if (t % 0.35 < delta) {
+            particles.spawnDanceSparkles(currentPosRef.current.clone().add(new THREE.Vector3(0, 0.4, 0)), 4);
+          }
+        } else if (t < 2.4) {
+          // Phase 2: Joyful leap & full 360 Spin!
+          const spinProgress = (t - 1.2) / 1.2;
+          const jumpHeight = Math.sin(spinProgress * Math.PI) * 0.7;
+          petNodes.bodyGroup.position.y = 0.55 + jumpHeight;
+          petNodes.bodyGroup.position.x = 0;
+          petNodes.bodyGroup.rotation.z = 0;
+          // Full 360 degree spin
+          petNodes.bodyGroup.rotation.y = spinProgress * Math.PI * 2;
+
+          petNodes.leftArm.rotation.x = -1.5;
+          petNodes.rightArm.rotation.x = -1.5;
+          petNodes.leftLeg.rotation.x = 0.3;
+          petNodes.rightLeg.rotation.x = -0.3;
+
+          if (t - delta < 1.25) {
+            particles.spawnDanceSparkles(currentPosRef.current.clone().add(new THREE.Vector3(0, 0.7, 0)), 8);
+          }
+        } else if (t < 3.2) {
+          // Phase 3: Fast foot-tap shuffle and head bop
+          petNodes.bodyGroup.rotation.y = 0;
+          petNodes.bodyGroup.position.x = 0;
+          petNodes.bodyGroup.position.y = 0.55 + Math.abs(Math.sin(t * 18)) * 0.1;
+          petNodes.bodyGroup.rotation.z = Math.sin(t * 16) * 0.14;
+
+          petNodes.headGroup.rotation.z = Math.sin(t * 14) * 0.18;
+          petNodes.leftLeg.rotation.x = Math.sin(t * 22) * 0.55;
+          petNodes.rightLeg.rotation.x = -Math.sin(t * 22) * 0.55;
+
+          petNodes.leftArm.rotation.x = -0.6 + Math.sin(t * 18) * 0.4;
+          petNodes.rightArm.rotation.x = -0.6 - Math.sin(t * 18) * 0.4;
+        } else if (t < 4.2) {
+          // Phase 4: Reverse 360 Spin Leap!
+          const spinProgress2 = (t - 3.2) / 1.0;
+          const jumpHeight2 = Math.sin(spinProgress2 * Math.PI) * 0.65;
+          petNodes.bodyGroup.position.y = 0.55 + jumpHeight2;
+          // Reverse 360 degree spin
+          petNodes.bodyGroup.rotation.y = -spinProgress2 * Math.PI * 2;
+
+          petNodes.leftArm.rotation.x = -1.5;
+          petNodes.rightArm.rotation.x = -1.5;
+
+          if (t - delta < 3.25) {
+            particles.spawnDanceSparkles(currentPosRef.current.clone().add(new THREE.Vector3(0, 0.7, 0)), 8);
+          }
+        } else {
+          // Dance completed!
+          petNodes.bodyGroup.rotation.y = 0;
+          petNodes.bodyGroup.rotation.z = 0;
+          petNodes.bodyGroup.position.x = 0;
+          petNodes.bodyGroup.position.y = 0.55;
+          petNodes.leftArm.rotation.x = 0;
+          petNodes.rightArm.rotation.x = 0;
+          petNodes.leftLeg.rotation.x = 0;
+          petNodes.rightLeg.rotation.x = 0;
+          petNodes.headGroup.rotation.z = 0;
+
+          animStateRef.current = 'happy';
+          animTimeRef.current = 0;
+          soundManager.playSqueak();
+          particles.spawnHearts(currentPosRef.current.clone().add(new THREE.Vector3(0, 0.8, 0)), 6);
+          callbacksRef.current.onDanceComplete?.();
+        }
+      } else if (state === 'sing') {
+        // Sings cute song with animated mouth and floating musical notes!
+        // 1. Mouth opening & closing in sync with notes
+        const mouthPulse = Math.pow(Math.abs(Math.sin(t * 10)), 1.4);
+        petNodes.mouthGroup.scale.set(
+          1.0 + mouthPulse * 0.35,
+          0.3 + mouthPulse * 1.8,
+          0.7 + mouthPulse * 0.4
+        );
+        petNodes.mouthGroup.position.y = 0.022 - mouthPulse * 0.012;
+
+        // Cheeks puff with vocal notes
+        petNodes.cheeksGroup.scale.set(1.0 + mouthPulse * 0.22, 1.0, 1.0);
+
+        // Vocalist cute posture: arms holding hands near chest
+        petNodes.leftArm.rotation.x = -0.85 + Math.sin(t * 5) * 0.12;
+        petNodes.rightArm.rotation.x = -0.85 - Math.sin(t * 5) * 0.12;
+        petNodes.leftArm.rotation.z = 0.28;
+        petNodes.rightArm.rotation.z = -0.28;
+
+        // Head swaying passionately to melody
+        petNodes.headGroup.rotation.z = Math.sin(t * 4.2) * 0.14;
+        petNodes.headGroup.rotation.x = -0.16 + Math.sin(t * 8) * 0.08;
+
+        // Body gentle sway & bob
+        petNodes.bodyGroup.rotation.z = Math.sin(t * 4.2) * 0.06;
+        petNodes.bodyGroup.position.y = 0.55 + Math.sin(t * 6) * 0.035;
+
+        // Ears perk up and wiggle sweetly
+        petNodes.leftEar.rotation.z = Math.sin(t * 7) * 0.15;
+        petNodes.rightEar.rotation.z = -Math.sin(t * 7) * 0.15;
+
+        // Spawn musical note particle on each note (~every 0.38s)
+        if (t - lastNoteSpawnTimeRef.current >= 0.38) {
+          lastNoteSpawnTimeRef.current = t;
+          particles.spawnMusicNotes(
+            currentPosRef.current.clone().add(new THREE.Vector3(0, 0.95, 0.2)),
+            1
+          );
+        }
+
+        if (t > 4.2) {
+          // Finished singing!
+          petNodes.mouthGroup.scale.set(0.9, 0.22, 0.7);
+          petNodes.mouthGroup.position.set(0, 0.022, 0.636);
+          petNodes.cheeksGroup.scale.set(1, 1, 1);
+          petNodes.leftArm.rotation.set(0, 0, 0);
+          petNodes.rightArm.rotation.set(0, 0, 0);
+          petNodes.headGroup.rotation.set(0, 0, 0);
+          petNodes.bodyGroup.rotation.set(0, 0, 0);
+
+          animStateRef.current = 'happy';
+          animTimeRef.current = 0;
+          soundManager.playSqueak();
+          particles.spawnHearts(currentPosRef.current.clone().add(new THREE.Vector3(0, 0.8, 0)), 6);
+          callbacksRef.current.onSingComplete?.();
+        }
       }
 
-      // 1) Hamster face always front-facing looking at camera
-      const toCam = camera.position.clone().sub(currentPosRef.current);
-      const targetRotY = Math.atan2(toCam.x, toCam.z);
+      // 1) Face camera smoothly when NOT walking and NOT in dance spinning state
+      if (!isWalkingRef.current && state !== 'dance') {
+        const toCam = camera.position.clone().sub(currentPosRef.current);
+        const targetRotY = Math.atan2(toCam.x, toCam.z);
 
-      let rotDiff = targetRotY - currentRotYRef.current;
-      while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-      while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-      currentRotYRef.current += rotDiff * 0.18;
+        let rotDiff = targetRotY - currentRotYRef.current;
+        while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+        while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+        currentRotYRef.current += rotDiff * 0.15;
 
-      // Apply root positions and front-facing rotation towards camera
+        // Soft natural head tracking so face and shiny eyes look directly at the player/camera
+        const horizontalDist = Math.max(0.1, Math.sqrt(toCam.x * toCam.x + toCam.z * toCam.z));
+        const pitchAngle = Math.atan2(toCam.y - (currentPosRef.current.y + 0.45), horizontalDist);
+        const clampedPitch = Math.max(-0.25, Math.min(0.32, pitchAngle));
+        petNodes.headGroup.rotation.x = -clampedPitch * 0.75;
+      }
+
+      // Talking mouth animation & expressive cute posture
+      if (
+        isTalkingRef.current &&
+        !pet.isSleeping &&
+        state !== 'dance'
+      ) {
+        // Mouth opens and closes in synchronized cute chatter rhythm
+        const talkPulse = Math.pow(Math.abs(Math.sin(t * 15)), 1.25);
+        petNodes.mouthGroup.scale.set(
+          1.0 + talkPulse * 0.45,
+          0.3 + talkPulse * 2.0,
+          0.7 + talkPulse * 0.4
+        );
+        petNodes.mouthGroup.position.y = 0.022 - talkPulse * 0.015;
+        petNodes.cheeksGroup.scale.set(1.0 + talkPulse * 0.22, 1.0, 1.0);
+
+        // Head bob and playful tilt while talking
+        petNodes.headGroup.rotation.z = Math.sin(t * 6.5) * 0.09;
+        petNodes.headGroup.rotation.x += Math.sin(t * 12) * 0.04;
+
+        // Animated paws gesturing sweetly
+        petNodes.leftArm.rotation.x = -0.55 + Math.sin(t * 8) * 0.18;
+        petNodes.rightArm.rotation.x = -0.55 - Math.sin(t * 8) * 0.18;
+
+        // Ear wiggles
+        petNodes.leftEar.rotation.z = Math.sin(t * 10) * 0.12;
+        petNodes.rightEar.rotation.z = -Math.sin(t * 10) * 0.12;
+      }
+
+      // Apply root positions and heading rotation
       petNodes.root.position.copy(currentPosRef.current);
       petNodes.root.rotation.y = currentRotYRef.current;
 
-      // Soft natural head tracking so face and shiny eyes look directly at the player/camera
-      const horizontalDist = Math.max(0.1, Math.sqrt(toCam.x * toCam.x + toCam.z * toCam.z));
-      const pitchAngle = Math.atan2(toCam.y - (currentPosRef.current.y + 0.45), horizontalDist);
-      const clampedPitch = Math.max(-0.25, Math.min(0.32, pitchAngle));
-      if (state !== 'eating' && state !== 'drinking') {
-        petNodes.headGroup.rotation.x = -clampedPitch * 0.75;
+      // Animate Friend Hamster (Multiplayer in same pink room)
+      if (friendNodesRef.current && friendPet) {
+        const fNodes = friendNodesRef.current;
+        const fTarget = friendTargetPosRef.current;
+        const fPos = friendCurrentPosRef.current;
+
+        const fDist = fPos.distanceTo(fTarget);
+        if (fDist > 0.05) {
+          const fDir = new THREE.Vector3().subVectors(fTarget, fPos).normalize();
+          const fSpeed = Math.min(fDist * 3.0, 1.8);
+          fPos.addScaledVector(fDir, fSpeed * delta);
+          fNodes.root.position.copy(fPos);
+
+          const targetAngle = Math.atan2(fDir.x, fDir.z);
+          let diff = targetAngle - friendHeadingRef.current;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          friendHeadingRef.current += diff * 0.18;
+          fNodes.root.rotation.y = friendHeadingRef.current;
+
+          const fStep = clock.getElapsedTime() * 14;
+          fNodes.leftLeg.rotation.x = Math.sin(fStep) * 0.45;
+          fNodes.rightLeg.rotation.x = -Math.sin(fStep) * 0.45;
+          fNodes.leftArm.rotation.x = -Math.sin(fStep) * 0.35;
+          fNodes.rightArm.rotation.x = Math.sin(fStep) * 0.35;
+          fNodes.bodyGroup.position.y = 0.55 + Math.abs(Math.sin(fStep)) * 0.05;
+        } else {
+          const fIdleTime = clock.getElapsedTime();
+          fNodes.bodyGroup.position.y = 0.55 + Math.sin(fIdleTime * 3.2 + 1.2) * 0.025;
+          fNodes.leftLeg.rotation.x = 0;
+          fNodes.rightLeg.rotation.x = 0;
+          fNodes.leftArm.rotation.x = 0;
+          fNodes.rightArm.rotation.x = 0;
+        }
+
+        // Friend special action sync
+        if (friendPet.action === 'dance') {
+          const fDanceTime = clock.getElapsedTime() * 6;
+          fNodes.root.rotation.y += 0.14;
+          fNodes.bodyGroup.position.y = 0.65 + Math.abs(Math.sin(fDanceTime)) * 0.22;
+          fNodes.leftArm.rotation.z = Math.sin(fDanceTime) * 0.5;
+          fNodes.rightArm.rotation.z = -Math.sin(fDanceTime) * 0.5;
+        } else if (friendPet.action === 'sing') {
+          const fSingTime = clock.getElapsedTime() * 8;
+          fNodes.mouthGroup.scale.set(1.1, 0.4 + Math.abs(Math.sin(fSingTime)) * 1.6, 0.8);
+          fNodes.mouthGroup.visible = true;
+        }
+      }
+
+      // Animate Ball Play 3D toy ball
+      if (ballGroupRef.current) {
+        const ballTime = clock.getElapsedTime();
+        ballGroupRef.current.position.y = 0.04 + Math.abs(Math.sin(ballTime * 3.2)) * 0.28;
+        ballGroupRef.current.rotation.y += 0.025;
+        ballGroupRef.current.rotation.x += 0.02;
       }
 
       // Update particle physics
@@ -688,6 +1183,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     return () => {
       cancelAnimationFrame(animFrameId);
       resizeObserver.disconnect();
+      soundManager.stopAllMusic();
       container.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
@@ -774,10 +1270,10 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         </button>
       </div>
 
-      {/* Swipe to Rotate Guide Hint (Appears gently at bottom of stage) */}
-      <div className="absolute bottom-1 pointer-events-none z-10 flex items-center gap-1 text-[10px] font-bold text-stone-500/80 bg-white/60 backdrop-blur-[1px] px-2.5 py-0.5 rounded-full border border-stone-200/50">
+      {/* Swipe to Rotate & Tap to Move Guide Hint */}
+      <div className="absolute bottom-1 pointer-events-none z-10 flex items-center gap-1 text-[10px] font-bold text-stone-600/90 bg-white/75 backdrop-blur-[2px] px-3 py-0.5 rounded-full border border-stone-200/60 shadow-xs">
         <Sparkles size={10} className="text-amber-500" />
-        <span>Drag to rotate 3D room • Tap pet or items</span>
+        <span>Tap floor to move • Drag to rotate • Tap pet or items</span>
       </div>
     </div>
   );

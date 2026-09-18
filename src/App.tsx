@@ -41,6 +41,10 @@ import { CleaningTool } from './components/CleaningTool';
 import { TutorialOverlay } from './components/TutorialOverlay';
 import { NotificationBanner } from './components/NotificationBanner';
 import { MiniGamesHub } from './components/games/MiniGamesHub';
+import { MultiplayerModal } from './components/MultiplayerModal';
+import { MultiplayerMiniGames } from './components/games/MultiplayerMiniGames';
+import { multiplayerManager } from './utils/multiplayer';
+import { MultiplayerRoom, MultiplayerPlayer, MultiplayerMiniGameType } from './types';
 
 export default function App() {
   // App view navigation
@@ -71,6 +75,12 @@ export default function App() {
   const [isPlayOpen, setIsPlayOpen] = useState<boolean>(false);
   const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
 
+  // Multiplayer state
+  const [isMultiplayerOpen, setIsMultiplayerOpen] = useState<boolean>(false);
+  const [isMultiplayerMiniGamesOpen, setIsMultiplayerMiniGamesOpen] = useState<boolean>(false);
+  const [activeMiniGame, setActiveMiniGame] = useState<MultiplayerMiniGameType | null>(null);
+  const [currentRoom, setCurrentRoom] = useState<MultiplayerRoom | null>(() => multiplayerManager.getCurrentRoom());
+
   // Temporary custom pet reaction speech
   const [customSpeech, setCustomSpeech] = useState<string | null>(null);
   const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -83,6 +93,29 @@ export default function App() {
   useEffect(() => {
     savePet(pet);
   }, [pet]);
+
+  // Subscribe to real-time room sync across tabs & local storage
+  useEffect(() => {
+    const unsubscribe = multiplayerManager.subscribeToRoom((room) => {
+      setCurrentRoom(room);
+      if (room?.activeGame && room.activeGame !== 'none') {
+        setActiveMiniGame(room.activeGame);
+      } else {
+        setActiveMiniGame(null);
+      }
+    });
+    return unsubscribe;
+  }, []);
+
+  // Determine friend pet in the room
+  const friendPet: MultiplayerPlayer | null = React.useMemo(() => {
+    if (!currentRoom) return null;
+    if (currentRoom.host.petId === pet.id) {
+      return currentRoom.guest || null;
+    } else {
+      return currentRoom.host;
+    }
+  }, [currentRoom, pet.id]);
 
   // Check if first-time user when entering home
   useEffect(() => {
@@ -304,6 +337,131 @@ export default function App() {
       };
     });
     triggerSpeech('Ahhh, cool crisp spring water! So refreshing! 💧✨');
+  };
+
+  // Dance talent action
+  const handleDance = () => {
+    setPet((prev) => {
+      const nextHappiness = Math.min(100, prev.stats.happiness + 18);
+      const nextEnergy = Math.min(100, prev.stats.energy + 10);
+      const { updatedPet, leveledUp } = addExperience(prev, 16);
+      if (leveledUp) handleCelebration();
+
+      return {
+        ...updatedPet,
+        stats: {
+          ...updatedPet.stats,
+          happiness: nextHappiness,
+          energy: nextEnergy,
+        },
+        lifetimeStats: {
+          ...updatedPet.lifetimeStats,
+          timesPlayed: updatedPet.lifetimeStats.timesPlayed + 1,
+        },
+      };
+    });
+    if (currentRoom) {
+      multiplayerManager.broadcastPlayerAction(pet.id, 'dance');
+    }
+    triggerSpeech(`Woohoo! Look at my spins and groovy moves! 💃✨`);
+  };
+
+  // Sing talent action
+  const handleSing = () => {
+    setPet((prev) => {
+      const nextHappiness = Math.min(100, prev.stats.happiness + 18);
+      const nextEnergy = Math.min(100, prev.stats.energy + 10);
+      const { updatedPet, leveledUp } = addExperience(prev, 16);
+      if (leveledUp) handleCelebration();
+
+      return {
+        ...updatedPet,
+        stats: {
+          ...updatedPet.stats,
+          happiness: nextHappiness,
+          energy: nextEnergy,
+        },
+        lifetimeStats: {
+          ...updatedPet.lifetimeStats,
+          timesPlayed: updatedPet.lifetimeStats.timesPlayed + 1,
+        },
+      };
+    });
+    if (currentRoom) {
+      multiplayerManager.broadcastPlayerAction(pet.id, 'sing');
+    }
+    triggerSpeech(`Tra-la-la-la-la! A special cute song just for you! 🎵🐹`);
+  };
+
+  // Multiplayer Movement & Room Actions
+  const handleTapFloorMove = (pos: { x: number; z: number }) => {
+    if (currentRoom) {
+      multiplayerManager.updatePlayerPosition(pet.id, pos);
+    }
+  };
+
+  const handleCreateMultiplayerRoom = () => {
+    const room = multiplayerManager.createRoom(pet);
+    setCurrentRoom(room);
+    soundManager.playLevelUp();
+    triggerSpeech(`Created Room #${room.code}! Share this code with a friend! 🎉`);
+  };
+
+  const handleJoinMultiplayerRoom = (code: string) => {
+    const success = multiplayerManager.joinRoom(code, pet);
+    if (success) {
+      soundManager.playLevelUp();
+      triggerSpeech(`Joined Room #${code}! Let's play together in the pink room! 💕`);
+    } else {
+      soundManager.playSqueak();
+      triggerSpeech(`Could not find or join Room #${code}. Check the 6-digit code!`);
+    }
+  };
+
+  const handleLeaveMultiplayerRoom = () => {
+    multiplayerManager.leaveRoom(pet.id);
+    setCurrentRoom(null);
+    setActiveMiniGame(null);
+    triggerSpeech(`Left the multiplayer room. Back to solo play! 🏡`);
+  };
+
+  const handleSimulateFriendJoin = () => {
+    multiplayerManager.simulateFriendJoin(pet);
+    soundManager.playLevelUp();
+    triggerSpeech(`A cute friend hamster just joined your pink room! 💖`);
+  };
+
+  const handleLaunchMiniGame = (game: MultiplayerMiniGameType) => {
+    setActiveMiniGame(game);
+    setIsMultiplayerMiniGamesOpen(true);
+    if (currentRoom) {
+      multiplayerManager.setRoomGame(game);
+    }
+  };
+
+  const handleCloseMiniGames = () => {
+    setIsMultiplayerMiniGamesOpen(false);
+    setActiveMiniGame(null);
+    if (currentRoom) {
+      multiplayerManager.setRoomGame(null);
+    }
+  };
+
+  const handleMiniGameReward = (coins: number, xp: number) => {
+    setPet((prev) => {
+      const { updatedPet, leveledUp } = addExperience(prev, xp);
+      if (leveledUp) handleCelebration();
+      return {
+        ...updatedPet,
+        coins: updatedPet.coins + coins,
+        lifetimeStats: {
+          ...updatedPet.lifetimeStats,
+          gamesPlayed: updatedPet.lifetimeStats.gamesPlayed + 1,
+          totalCoinsEarned: updatedPet.lifetimeStats.totalCoinsEarned + coins,
+        },
+      };
+    });
+    soundManager.playLevelUp();
   };
 
   // Clean Pet (Finish washing)
@@ -530,6 +688,8 @@ export default function App() {
             onOpenFeed={() => setIsFoodOpen(true)}
             onFeedItem={handleFeedItem}
             onGiveWater={handleGiveWater}
+            onDance={handleDance}
+            onSing={handleSing}
             feedTriggerProp={feedTrigger}
             waterTriggerProp={waterTrigger}
             onOpenPlay={() => setIsPlayOpen(true)}
@@ -543,6 +703,12 @@ export default function App() {
             customSpeechMessage={customSpeech}
             dailyRewardAvailable={dailyRewardAvailable}
             isCleanOpen={isCleanOpen}
+            onOpenMultiplayer={() => setIsMultiplayerOpen(true)}
+            onOpenMiniGames={() => setIsMultiplayerMiniGamesOpen(true)}
+            currentRoom={currentRoom}
+            friendPet={friendPet}
+            onTapFloorMove={handleTapFloorMove}
+            activeGame={activeMiniGame}
           />
         )}
 
@@ -640,6 +806,33 @@ export default function App() {
           onClose={() => setIsPlayOpen(false)}
           petType={pet.type}
           onGameReward={handleGameReward}
+        />
+
+        {/* Multiplayer Room Manager Modal (Create 6-digit room or Join) */}
+        <MultiplayerModal
+          isOpen={isMultiplayerOpen}
+          onClose={() => setIsMultiplayerOpen(false)}
+          pet={pet}
+          currentRoom={currentRoom}
+          onCreateRoom={handleCreateMultiplayerRoom}
+          onJoinRoom={handleJoinMultiplayerRoom}
+          onLeaveRoom={handleLeaveMultiplayerRoom}
+          onSimulateFriend={handleSimulateFriendJoin}
+          onOpenMiniGames={() => {
+            setIsMultiplayerOpen(false);
+            setIsMultiplayerMiniGamesOpen(true);
+          }}
+        />
+
+        {/* Multiplayer Mini Games Modal (Race, Hide & Seek, Ball Play) */}
+        <MultiplayerMiniGames
+          isOpen={isMultiplayerMiniGamesOpen}
+          onClose={handleCloseMiniGames}
+          playerPet={{ name: pet.name, id: pet.id, type: pet.type }}
+          friendPet={friendPet}
+          activeGame={activeMiniGame}
+          onSelectGame={handleLaunchMiniGame}
+          onReward={handleMiniGameReward}
         />
 
         {/* First-time Tutorial Walkthrough */}

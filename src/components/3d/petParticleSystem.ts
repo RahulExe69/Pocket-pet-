@@ -160,6 +160,132 @@ export class PetParticleSystem {
     }
   }
 
+  // Pre-cached sprite materials for musical notes
+  private noteMaterials: THREE.SpriteMaterial[] = [];
+
+  private getNoteMaterial(): THREE.SpriteMaterial {
+    if (this.noteMaterials.length === 0 && typeof document !== 'undefined') {
+      const symbols = ['♪', '♫', '♬', '♩'];
+      const colors = ['#ff4081', '#ffb300', '#00e5ff', '#b388ff', '#00e676'];
+
+      symbols.forEach((sym) => {
+        colors.forEach((col) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 64;
+          canvas.height = 64;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, 64, 64);
+            ctx.font = 'bold 44px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = col;
+            ctx.fillText(sym, 32, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.SpriteMaterial({
+              map: texture,
+              transparent: true,
+              opacity: 0.95,
+              depthWrite: false,
+            });
+            this.noteMaterials.push(mat);
+          }
+        });
+      });
+    }
+
+    if (this.noteMaterials.length > 0) {
+      return this.noteMaterials[Math.floor(Math.random() * this.noteMaterials.length)];
+    }
+
+    return new THREE.SpriteMaterial({ transparent: true, opacity: 0.9 });
+  }
+
+  public spawnMusicNotes(position: THREE.Vector3, count = 1) {
+    for (let i = 0; i < count; i++) {
+      const mat = this.getNoteMaterial();
+      const sprite = new THREE.Sprite(mat);
+      sprite.scale.set(0.28, 0.28, 1);
+
+      sprite.position.copy(position).add(
+        new THREE.Vector3(
+          (Math.random() - 0.5) * 0.35,
+          (Math.random() - 0.2) * 0.2,
+          (Math.random() - 0.5) * 0.35
+        )
+      );
+
+      this.group.add(sprite);
+      this.particles.push({
+        mesh: sprite,
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.4,
+          0.75 + Math.random() * 0.4,
+          (Math.random() - 0.5) * 0.4
+        ),
+        life: 0,
+        maxLife: 1.6 + Math.random() * 0.4,
+        scaleDelta: 0.04,
+      });
+    }
+  }
+
+  public spawnDanceSparkles(position: THREE.Vector3, count = 6) {
+    const colors = [0xffd700, 0xff69b4, 0x00f5d4, 0x7b2cbf, 0xffbe0b];
+    const sparkleGeo = new THREE.OctahedronGeometry(0.045, 0);
+
+    for (let i = 0; i < count; i++) {
+      const col = colors[Math.floor(Math.random() * colors.length)];
+      const mat = getEmissiveMaterial(col, 0.9);
+      const mesh = new THREE.Mesh(sparkleGeo, mat);
+
+      // Distribute in a cute radial ring around pet
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+      const radius = 0.35 + Math.random() * 0.25;
+      mesh.position.set(
+        position.x + Math.cos(angle) * radius,
+        position.y + 0.2 + Math.random() * 0.4,
+        position.z + Math.sin(angle) * radius
+      );
+
+      this.group.add(mesh);
+      this.particles.push({
+        mesh,
+        velocity: new THREE.Vector3(
+          Math.cos(angle) * 0.5,
+          0.8 + Math.random() * 0.8,
+          Math.sin(angle) * 0.5
+        ),
+        life: 0,
+        maxLife: 1.0 + Math.random() * 0.4,
+        scaleDelta: 0.02,
+      });
+    }
+  }
+
+  public spawnFootstepDust(position: THREE.Vector3) {
+    const dustMat = getToonMaterial(0xfff3e0, 0.3);
+    const dustGeo = new THREE.SphereGeometry(0.04, 6, 6);
+    dustGeo.scale(1.2, 0.5, 1.2);
+
+    const mesh = new THREE.Mesh(dustGeo, dustMat);
+    mesh.position.copy(position).add(
+      new THREE.Vector3((Math.random() - 0.5) * 0.1, 0.02, (Math.random() - 0.5) * 0.1)
+    );
+
+    this.group.add(mesh);
+    this.particles.push({
+      mesh,
+      velocity: new THREE.Vector3((Math.random() - 0.5) * 0.1, 0.12, (Math.random() - 0.5) * 0.1),
+      life: 0,
+      maxLife: 0.55,
+      scaleDelta: -0.01,
+    });
+  }
+
   public update(delta: number) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];

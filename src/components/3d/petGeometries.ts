@@ -25,6 +25,7 @@ export interface PetNodes {
   rightLeg: THREE.Group;
   cheeksGroup: THREE.Group;
   snout: THREE.Mesh;
+  mouthGroup: THREE.Group;
   accessoryGroup: THREE.Group;
   heldFoodGroup: THREE.Group;
 }
@@ -109,6 +110,37 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   const philtrum = new THREE.Mesh(philtrumGeo, philtrumMat);
   philtrum.position.set(0, 0.052, 0.640);
   headGroup.add(philtrum);
+
+  // 4b. Expressive animated mouth with cavity, pink tongue, and cute buck teeth
+  const mouthGroup = new THREE.Group();
+  mouthGroup.name = 'mouth-group';
+  mouthGroup.position.set(0, 0.022, 0.636);
+  headGroup.add(mouthGroup);
+
+  const mouthCavityGeo = new THREE.SphereGeometry(0.036, 12, 10);
+  mouthCavityGeo.scale(1.0, 0.85, 0.45);
+  const mouthCavityMat = getToonMaterial(0x822543, 0.45);
+  const mouthCavityMesh = new THREE.Mesh(mouthCavityGeo, mouthCavityMat);
+  mouthGroup.add(mouthCavityMesh);
+
+  const tongueGeo = new THREE.SphereGeometry(0.022, 10, 8);
+  tongueGeo.scale(1.1, 0.55, 0.65);
+  const tongueMat = getToonMaterial(0xff7594, 0.35);
+  const tongueMesh = new THREE.Mesh(tongueGeo, tongueMat);
+  tongueMesh.position.set(0, -0.012, 0.014);
+  mouthGroup.add(tongueMesh);
+
+  const toothGeo = new THREE.BoxGeometry(0.012, 0.015, 0.008);
+  const toothMat = getToonMaterial(0xffffff, 0.1);
+  const leftTooth = new THREE.Mesh(toothGeo, toothMat);
+  leftTooth.position.set(-0.008, 0.015, 0.012);
+  mouthGroup.add(leftTooth);
+  const rightTooth = new THREE.Mesh(toothGeo, toothMat);
+  rightTooth.position.set(0.008, 0.015, 0.012);
+  mouthGroup.add(rightTooth);
+
+  // Default resting smile scale
+  mouthGroup.scale.set(0.9, 0.22, 0.7);
 
   // Delicate realistic hamster whiskers (3 on left, 3 on right)
   const whiskerMat = new THREE.LineBasicMaterial({
@@ -418,6 +450,7 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
     rightLeg,
     cheeksGroup,
     snout,
+    mouthGroup,
     accessoryGroup,
     heldFoodGroup,
   };

@@ -330,3 +330,153 @@ export function getGlassMaterial(colorHex = 0xa5d8ff, opacity = 0.5): THREE.Mesh
   materialCache.set(key, mat);
   return mat;
 }
+
+// 3D Billboard Name Tag for friend / player hamster
+export function createPetNameTagSprite(name: string, petId: string, isFriend = true): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    ctx.clearRect(0, 0, 512, 160);
+
+    // Rounded tag bubble background
+    const x = 20;
+    const y = 14;
+    const w = 472;
+    const h = 106;
+    const r = 36;
+
+    ctx.save();
+    // Soft shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 6;
+
+    // Fill bubble
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+
+    // Pointer bottom tip
+    const midX = x + w / 2;
+    ctx.lineTo(midX + 16, y + h);
+    ctx.lineTo(midX, y + h + 22);
+    ctx.lineTo(midX - 16, y + h);
+
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+
+    ctx.fillStyle = isFriend ? '#ffffff' : '#fffbeb';
+    ctx.fill();
+
+    // Border stroke
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = isFriend ? '#f43f5e' : '#f59e0b';
+    ctx.stroke();
+    ctx.restore();
+
+    // Icon / Badge
+    ctx.font = '36px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isFriend ? '🐾' : '👑', x + 26, y + h / 2 - 4);
+
+    // Pet Name
+    ctx.font = 'bold 38px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#1e293b';
+    const displayTitle = name.length > 9 ? name.substring(0, 8) + '…' : name;
+    ctx.fillText(displayTitle, x + 84, y + h / 2 - 12);
+
+    // Pet ID Badge
+    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isFriend ? '#e11d48' : '#d97706';
+    ctx.fillText(`[${petId}]`, x + 84, y + h / 2 + 24);
+
+    // Friend / Host Pill Tag
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = isFriend ? '#be185d' : '#b45309';
+    ctx.fillText(isFriend ? 'FRIEND 💖' : 'HOST ⭐', x + w - 24, y + h / 2 + 4);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  const spriteMat = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const sprite = new THREE.Sprite(spriteMat);
+  sprite.scale.set(1.4, 0.44, 1);
+  sprite.position.set(0, 1.15, 0);
+  return sprite;
+}
+
+// 3D Bouncy Play Ball for Ball Play mini-game
+export function createHamsterPlayBall(): THREE.Group {
+  const group = new THREE.Group();
+  const radius = 0.18;
+  const sphereGeo = new THREE.SphereGeometry(radius, 32, 24);
+
+  // Generate colorful striped beach-ball canvas texture
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const stripes = ['#ff4757', '#ffa502', '#2ed573', '#1e90ff', '#9b59b6', '#ffffff'];
+    const w = 256 / stripes.length;
+    stripes.forEach((color, i) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(i * w, 0, w, 128);
+    });
+    // Top & bottom white caps
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(128, 0, 36, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(128, 128, 36, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const ballMat = new THREE.MeshStandardMaterial({
+    map: texture,
+    roughness: 0.25,
+    metalness: 0.15,
+  });
+
+  const ballMesh = new THREE.Mesh(sphereGeo, ballMat);
+  ballMesh.castShadow = true;
+  ballMesh.position.y = radius;
+  group.add(ballMesh);
+
+  // Soft contact shadow underneath
+  const shadowGeo = new THREE.CircleGeometry(radius * 1.05, 24);
+  shadowGeo.rotateX(-Math.PI / 2);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.25,
+    depthWrite: false,
+  });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowMesh.position.y = 0.008;
+  group.add(shadowMesh);
+
+  group.name = 'HamsterPlayBall';
+  return group;
+}
+
