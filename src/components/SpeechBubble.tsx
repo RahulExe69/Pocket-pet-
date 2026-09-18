@@ -37,16 +37,16 @@ export const SpeechBubble: React.FC<SpeechBubbleProps> = ({
   }, [mood, customMessage]);
 
   return (
-    <div id="pet-speech-bubble-wrapper" className="relative flex justify-center items-center my-2 h-14">
+    <div id="pet-speech-bubble-wrapper" className="relative flex justify-center items-center my-1.5 min-h-12 w-full">
       <AnimatePresence mode="wait">
         <motion.div
           key={currentText}
-          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+          initial={{ opacity: 0, scale: 0.85, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.8, y: -8 }}
+          exit={{ opacity: 0, scale: 0.85, y: -6 }}
           transition={{ type: 'spring', stiffness: 350, damping: 24 }}
           onClick={onBubbleClick}
-          className="relative bg-white/95 backdrop-blur-sm border-2 border-stone-200/80 shadow-md px-4 py-2 rounded-2xl text-stone-800 text-sm font-semibold tracking-wide flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+          className="relative bg-white/95 backdrop-blur-sm border-2 border-stone-200/90 shadow-md px-4 py-2 rounded-2xl text-stone-800 text-xs sm:text-sm font-semibold tracking-wide text-center leading-snug max-w-[290px] sm:max-w-[380px] cursor-pointer hover:scale-105 active:scale-95 transition-transform whitespace-pre-line"
         >
           <span>{currentText}</span>
 

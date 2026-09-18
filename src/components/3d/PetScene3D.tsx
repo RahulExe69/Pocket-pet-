@@ -96,8 +96,8 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   // Animation controller refs
   const animStateRef = useRef<AnimationState>('idle');
   const animTimeRef = useRef<number>(0);
-  const targetPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
-  const currentPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
+  const targetPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0.2));
+  const currentPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0.2));
   const currentRotYRef = useRef<number>(0);
   const isWalkingRef = useRef<boolean>(false);
   const lastStateChangeRef = useRef<number>(Date.now());
@@ -114,16 +114,16 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   const floorMarkerRef = useRef<{ ring: THREE.Mesh; dot: THREE.Mesh; life: number } | null>(null);
   const lastNoteSpawnTimeRef = useRef<number>(0);
 
-  // Camera Orbit State
+  // Camera Orbit State - balanced framing showing hamster centered in foreground with surrounding 3D room
   const cameraAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
     theta: 0,
-    phi: 0.45,
-    radius: 5.6,
+    phi: 0.46,
+    radius: 5.4,
   });
   const targetAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
     theta: 0,
-    phi: 0.45,
-    radius: 5.6,
+    phi: 0.46,
+    radius: 5.4,
   });
   const isDraggingRef = useRef<boolean>(false);
   const lastPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -247,6 +247,8 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       petNodesRef.current.leftArm.rotation.set(0, 0, 0);
       petNodesRef.current.rightArm.rotation.set(0, 0, 0);
       petNodesRef.current.headGroup.rotation.set(0, 0, 0);
+      petNodesRef.current.leftEye.scale.y = 1.05;
+      petNodesRef.current.rightEye.scale.y = 1.05;
     }
   }, [isTalking]);
 
@@ -255,11 +257,11 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     setCameraMode(mode);
     soundManager.playPop();
     if (mode === 'front') {
-      targetAngleRef.current = { theta: 0, phi: 0.42, radius: 5.4 };
+      targetAngleRef.current = { theta: 0, phi: 0.46, radius: 5.4 };
     } else if (mode === 'angled') {
-      targetAngleRef.current = { theta: 0.45, phi: 0.52, radius: 5.8 };
+      targetAngleRef.current = { theta: 0.42, phi: 0.52, radius: 5.8 };
     } else if (mode === 'top') {
-      targetAngleRef.current = { theta: -0.3, phi: 0.82, radius: 6.2 };
+      targetAngleRef.current = { theta: -0.25, phi: 0.80, radius: 6.2 };
     }
   };
 
@@ -277,7 +279,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     } else {
       if (animStateRef.current === 'sleeping') {
         animStateRef.current = 'idle';
-        targetPosRef.current.set(0, 0, 0);
+        targetPosRef.current.set(0, 0, 0.2);
       }
     }
   }, [pet.isSleeping]);
@@ -333,6 +335,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         }
 
         const fNodes = buildPetModel(friendPet.petType || 'hamster', friendPet.customization || { accessory: 'bow-pink' });
+        fNodes.root.scale.set(0.95, 0.95, 0.95);
         fNodes.root.userData.petId = friendPet.petId;
         friendNodesRef.current = fNodes;
 
@@ -410,9 +413,9 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     scene.background = pet.isSleeping ? new THREE.Color(0x2d1a33) : new THREE.Color(0xffe9f0);
     sceneRef.current = scene;
 
-    // 2. Camera
+    // 2. Camera - balanced perspective showing hamster and room environment
     const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 30);
-    camera.position.set(0, 3.2, 5.6);
+    camera.position.set(0, 2.8, 5.4);
     cameraRef.current = camera;
 
     // 3. Renderer
@@ -434,8 +437,9 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     roomNodesRef.current = roomNodes;
     scene.add(roomNodes.group);
 
-    // 5. Build 3D Pet
+    // 5. Build 3D Pet - cute, naturally proportioned, fully visible from head to body
     const petNodes = buildPetModel(pet.type, pet.customization);
+    petNodes.root.scale.set(0.95, 0.95, 0.95);
     petNodesRef.current = petNodes;
     scene.add(petNodes.root);
 
@@ -667,21 +671,17 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       const camX = curCam.radius * Math.sin(curCam.theta) * Math.sin(curCam.phi);
       const camY = curCam.radius * Math.cos(curCam.phi);
       const camZ = curCam.radius * Math.cos(curCam.theta) * Math.sin(curCam.phi);
-      camera.position.set(camX, camY + 0.5, camZ);
-      camera.lookAt(0, 0.7, 0);
+      camera.position.set(camX, camY + 0.4, camZ);
+      camera.lookAt(0, 0.65, 0.1);
 
-      // Random spontaneous pet activity when idle
+      // Hamster always standing front center: gently return to front if displaced
       if (
         !pet.isSleeping &&
         animStateRef.current === 'idle' &&
-        Date.now() - lastStateChangeRef.current > 7000 &&
-        Math.random() < 0.015
+        currentPosRef.current.distanceTo(new THREE.Vector3(0, 0, 0.2)) > 0.15 &&
+        !isWalkingRef.current
       ) {
-        lastStateChangeRef.current = Date.now();
-        // Wander to a random cozy spot in room
-        const randomX = (Math.random() - 0.5) * 2.8;
-        const randomZ = (Math.random() - 0.5) * 2.5;
-        targetPosRef.current.set(randomX, 0, randomZ);
+        targetPosRef.current.set(0, 0, 0.2);
         animStateRef.current = 'walking';
         isWalkingRef.current = true;
       }
@@ -1080,33 +1080,52 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         petNodes.headGroup.rotation.x = -clampedPitch * 0.75;
       }
 
-      // Talking mouth animation & expressive cute posture
+      // Talking mouth animation & expressive cute natural posture
       if (
         isTalkingRef.current &&
         !pet.isSleeping &&
         state !== 'dance'
       ) {
-        // Mouth opens and closes in synchronized cute chatter rhythm
-        const talkPulse = Math.pow(Math.abs(Math.sin(t * 15)), 1.25);
+        // Natural syllable rhythm with multi-frequency harmonic articulation
+        const syllableMotion = Math.sin(t * 11.0) * 0.55 + Math.sin(t * 16.5) * 0.25 + 0.2;
+        const talkPulse = Math.max(0.04, Math.min(0.85, syllableMotion));
+
+        // Smooth, natural mouth opening without exaggeration
         petNodes.mouthGroup.scale.set(
-          1.0 + talkPulse * 0.45,
-          0.3 + talkPulse * 2.0,
-          0.7 + talkPulse * 0.4
+          0.92 + talkPulse * 0.22,
+          0.26 + talkPulse * 0.62,
+          0.70 + talkPulse * 0.12
         );
-        petNodes.mouthGroup.position.y = 0.022 - talkPulse * 0.015;
-        petNodes.cheeksGroup.scale.set(1.0 + talkPulse * 0.22, 1.0, 1.0);
+        petNodes.mouthGroup.position.y = 0.022 - talkPulse * 0.007;
+        petNodes.cheeksGroup.scale.set(1.0 + talkPulse * 0.08, 1.0, 1.0);
 
-        // Head bob and playful tilt while talking
-        petNodes.headGroup.rotation.z = Math.sin(t * 6.5) * 0.09;
-        petNodes.headGroup.rotation.x += Math.sin(t * 12) * 0.04;
+        // Subtle conversational blinking synchronized during speech
+        const speechBlinkCycle = (t * 0.45) % 1.0;
+        if (speechBlinkCycle > 0.94) {
+          // Soft 120ms natural eyelid dip
+          petNodes.leftEye.scale.y = 0.12;
+          petNodes.rightEye.scale.y = 0.12;
+        } else {
+          petNodes.leftEye.scale.y = 1.05;
+          petNodes.rightEye.scale.y = 1.05;
+        }
 
-        // Animated paws gesturing sweetly
-        petNodes.leftArm.rotation.x = -0.55 + Math.sin(t * 8) * 0.18;
-        petNodes.rightArm.rotation.x = -0.55 - Math.sin(t * 8) * 0.18;
+        // Small, subtle head movements (inquisitive micro-tilt, micro-nod, and micro-turn)
+        const headTiltZ = Math.sin(t * 3.2) * 0.035 + Math.sin(t * 1.8) * 0.015;
+        const headNodX = Math.sin(t * 5.2) * 0.022;
+        const headTurnY = Math.sin(t * 2.2) * 0.028;
 
-        // Ear wiggles
-        petNodes.leftEar.rotation.z = Math.sin(t * 10) * 0.12;
-        petNodes.rightEar.rotation.z = -Math.sin(t * 10) * 0.12;
+        petNodes.headGroup.rotation.z = headTiltZ;
+        petNodes.headGroup.rotation.y = headTurnY;
+        petNodes.headGroup.rotation.x += headNodX;
+
+        // Gentle relaxed paws posture
+        petNodes.leftArm.rotation.x = -0.35 + Math.sin(t * 3.6) * 0.06;
+        petNodes.rightArm.rotation.x = -0.35 - Math.sin(t * 3.6) * 0.06;
+
+        // Subtle gentle ear twitches
+        petNodes.leftEar.rotation.z = Math.sin(t * 4.2) * 0.04;
+        petNodes.rightEar.rotation.z = -Math.sin(t * 4.2) * 0.04;
       }
 
       // Apply root positions and heading rotation

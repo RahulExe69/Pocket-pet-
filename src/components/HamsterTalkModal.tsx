@@ -20,6 +20,7 @@ import {
   getCuteHamsterAnswer,
   isSpeechRecognitionSupported,
 } from '../utils/speech';
+import { askGeminiHamster, ChatHistoryItem } from '../services/gemini';
 import { soundManager } from '../utils/audio';
 
 export interface ChatMessage {
@@ -31,7 +32,7 @@ export interface ChatMessage {
 }
 
 export interface HamsterTalkModalProps {
-  mode: 'repeat' | 'chat' | null;
+  mode: 'repeat' | 'answer' | 'chat' | null;
   isOpen: boolean;
   onClose: () => void;
   petName: string;
@@ -83,8 +84,10 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
 
   // Sync active tab with opened mode
   useEffect(() => {
-    if (mode) {
-      setActiveTab(mode);
+    if (mode === 'repeat') {
+      setActiveTab('repeat');
+    } else if (mode === 'answer' || mode === 'chat') {
+      setActiveTab('chat');
     }
   }, [mode]);
 
@@ -202,17 +205,17 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
     if (!cleaned) return;
 
     setLastRepeatExchange({ user: cleaned, pet: cleaned });
-    setRepeatStatus(
-      selectedLanguage === 'BN'
-        ? `"${cleaned}" কিউট গলায় রিপিট করছি! ✨`
-        : selectedLanguage === 'HI'
-        ? `"${cleaned}" प्यारी आवाज़ में दोहरा रहा हूँ! ✨`
-        : `Repeating "${cleaned}" in cute 1.6x pitch! ✨`
-    );
-    soundManager.playSqueak();
+        setRepeatStatus(
+          selectedLanguage === 'BN'
+            ? `"${cleaned}" কিউট গলায় রিপিট করছি! ✨`
+            : selectedLanguage === 'HI'
+            ? `"${cleaned}" प्यारी आवाज़ में दोहरा रहा हूँ! ✨`
+            : `Repeating "${cleaned}" in cute 1.8x pitch! ✨`
+        );
+        soundManager.playSqueak();
 
-    // Show user text in bubble first, then hamster repeats same in pitch 1.6 with mouth animation!
-    onHamsterSpeak(cleaned, selectedLanguage, cleaned);
+        // Show user text in bubble first, then hamster repeats same in pitch 1.8 with mouth animation!
+        onHamsterSpeak(cleaned, selectedLanguage, cleaned);
   };
 
   // -------------------------------------------------------------
@@ -256,7 +259,7 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
     speechControllerRef.current = controller;
   };
 
-  const executeChat = (questionText: string) => {
+  const executeChat = async (questionText: string) => {
     const cleaned = questionText.trim();
     if (!cleaned) return;
 
@@ -274,9 +277,15 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
     setIsChatTyping(true);
     soundManager.playPop();
 
-    // Simulate smart AI response thinking delay
-    setTimeout(() => {
-      const answer = getCuteHamsterAnswer(cleaned, selectedLanguage, petName);
+    try {
+      // Build context history for Gemini
+      const history: ChatHistoryItem[] = chatMessages.slice(-8).map((m) => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        text: m.text,
+      }));
+
+      const answer = await askGeminiHamster(cleaned, history, selectedLanguage, petName);
+
       const hamsterMsg: ChatMessage = {
         id: `hamster-${Date.now()}`,
         sender: 'hamster',
@@ -291,7 +300,22 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
 
       // Speak answer with cute voice and show bubble above 3D hamster
       onHamsterSpeak(answer, selectedLanguage);
-    }, 450);
+    } catch (err) {
+      console.error('Chat error:', err);
+      setIsChatTyping(false);
+      const fallback = getCuteHamsterAnswer(cleaned, selectedLanguage, petName);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `hamster-${Date.now()}`,
+          sender: 'hamster',
+          text: fallback,
+          timestamp: Date.now(),
+          lang: selectedLanguage,
+        },
+      ]);
+      onHamsterSpeak(fallback, selectedLanguage);
+    }
   };
 
   const handleClearChat = () => {
@@ -361,10 +385,10 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
                   }`}
                 >
                   <RotateCcw size={14} />
-                  <span>Tab 1: REPEAT</span>
+                  <span>Button 1: REPEAT</span>
                 </button>
 
-                {/* Tab 2: CHAT GPT */}
+                {/* Tab 2: ANSWER */}
                 <button
                   id="tab-btn-chatgpt"
                   onClick={() => {
@@ -379,7 +403,7 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
                   }`}
                 >
                   <Bot size={14} />
-                  <span>Tab 2: CHAT GPT</span>
+                  <span>Button 2: ANSWER</span>
                 </button>
               </div>
 
@@ -432,7 +456,7 @@ export const HamsterTalkModal: React.FC<HamsterTalkModalProps> = ({
                   Voice Mimic Studio
                 </h3>
                 <p className="text-xs text-stone-500 font-medium">
-                  Hold the big mic, speak anything, and {petName} will repeat in a cute 1.6x high pitch!
+                  Hold the big mic, speak anything, and {petName} will repeat in a cute 1.8x high pitch!
                 </p>
               </div>
 

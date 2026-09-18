@@ -47,6 +47,106 @@ export const SUPPORTED_LANGUAGES: Record<TalkingLanguage, LanguageMeta> = {
   },
 };
 
+// Helper to select the highest-quality, warmest, and most natural voice available
+function selectBestWarmVoice(voices: SpeechSynthesisVoice[], langCode: string): SpeechSynthesisVoice | null {
+  if (!voices || voices.length === 0) return null;
+  const langPrefix = langCode.split('-')[0].toLowerCase();
+  const matching = voices.filter((v) =>
+    v.lang.toLowerCase().replace('_', '-').startsWith(langPrefix)
+  );
+  if (matching.length === 0) return null;
+
+  const scoreVoice = (v: SpeechSynthesisVoice): number => {
+    const name = v.name.toLowerCase();
+    let score = 0;
+
+    // Prioritize natural neural voices
+    if (name.includes('natural') || name.includes('neural')) score += 100;
+    if (name.includes('online')) score += 40;
+
+    // Friendly, sweet, and warm voice personas
+    if (name.includes('samantha')) score += 75;
+    if (name.includes('victoria')) score += 70;
+    if (name.includes('karen')) score += 70;
+    if (name.includes('tessa')) score += 70;
+    if (name.includes('jenny')) score += 80;
+    if (name.includes('aria')) score += 80;
+    if (name.includes('moira') || name.includes('fiona') || name.includes('serena')) score += 65;
+    if (name.includes('google')) score += 60;
+    if (name.includes('swara') || name.includes('kalpana')) score += 75; // Top Hindi voices
+    if (name.includes('mitra') || name.includes('bangla')) score += 75; // Top Bengali voices
+
+    // Soft female tone matches cute pet voice best when pitch-shifted
+    if (name.includes('female') || name.includes('woman') || name.includes('girl')) score += 30;
+
+    // Full locale match
+    if (v.lang.toLowerCase().replace('_', '-') === langCode.toLowerCase().replace('_', '-')) score += 25;
+
+    // Penalize mechanical, robotic or low-resolution voices
+    if (name.includes('compact')) score -= 60;
+    if (name.includes('espeak')) score -= 100;
+    if (name.includes('desktop') && !name.includes('natural')) score -= 25;
+
+    return score;
+  };
+
+  matching.sort((a, b) => scoreVoice(b) - scoreVoice(a));
+  return matching[0];
+}
+
+// Clean and prepare text for natural, smooth, non-robotic speech rhythm
+export function prepareTextForNaturalSpeech(raw: string): string {
+  if (!raw) return '';
+  let text = raw;
+
+  // 1. Remove markdown symbols (*, _, #, `, ~) so synthesizer doesn't pronounce them or pause unnaturally
+  text = text.replace(/[*_#`~>]/g, ' ');
+
+  // 2. Remove emojis that can be pronounced as awkward long names
+  text = text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, ' ');
+
+  // 3. Clean quotes and bracket wrappers
+  text = text.replace(/[""''«»]/g, '');
+
+  // 4. Normalize lists, hyphens, and bullets into clean pauses
+  text = text.replace(/^\s*[-•–—]\s*/gm, '');
+  text = text.replace(/[-–—]{2,}/g, ', ');
+
+  // 5. Replace multiple dots/ellipses with a single clean period
+  text = text.replace(/\.{2,}/g, '.');
+
+  // 6. Ensure clean space after punctuation marks (. , ! ? ; : Bengali dari ।) so sentences breathe naturally
+  text = text.replace(/([.!?;:।])(?=[^\s0-9])/g, '$1 ');
+
+  // 7. Collapse multiple spaces
+  text = text.replace(/\s+/g, ' ').trim();
+
+  // 8. Ensure proper sentence termination so the last syllable doesn't cut off
+  if (text && !/[.!?।]$/.test(text)) {
+    text += '.';
+  }
+
+  return text;
+}
+
+// Pre-warm voices on startup
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  try {
+    window.speechSynthesis.getVoices();
+    if ('onvoiceschanged' in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        try {
+          window.speechSynthesis.getVoices();
+        } catch {}
+      };
+    }
+  } catch {}
+}
+
+// Global active utterance reference to prevent Chrome/Safari garbage-collection bug
+let activeUtterance: SpeechSynthesisUtterance | null = null;
+let keepAliveTimer: any = null;
+
 // Check if Speech Recognition is supported by the browser/device
 export function isSpeechRecognitionSupported(): boolean {
   if (typeof window === 'undefined') return false;
@@ -79,50 +179,83 @@ export function speakHamsterVoice(
   }
 
   try {
-    // Cancel any currently playing speech to avoid overlaps
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.resume();
+    // Clear any previous utterance listeners
+    if (activeUtterance) {
+      activeUtterance.onstart = null;
+      activeUtterance.onend = null;
+      activeUtterance.onerror = null;
+      activeUtterance = null;
+    }
+    if (keepAliveTimer) {
+      clearInterval(keepAliveTimer);
+      keepAliveTimer = null;
+    }
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Natural text preparation for smooth sentence rhythm, pauses and zero robotic stutters
+    const naturalSpeechText = prepareTextForNaturalSpeech(text);
+    if (!naturalSpeechText) {
+      options?.onEnd?.();
+      return;
+    }
+
     const langMeta = SUPPORTED_LANGUAGES[lang];
+    const utterance = new SpeechSynthesisUtterance(naturalSpeechText);
     utterance.lang = langMeta.code;
 
-    // Strict requirement: SpeechSynthesis with pitch 1.6 for cute high-pitched hamster voice!
-    utterance.pitch = 1.6;
-    utterance.rate = 1.15; // Energetic cute tempo
+    // Cute, soft, warm, friendly slightly high-pitched hamster voice (1.28 pitch prevents metallic distortion)
+    utterance.pitch = 1.28;
+    utterance.rate = 1.0; // Comfortable, natural conversational pacing
     utterance.volume = 1.0;
 
-    // Pick best matching voice for the target language if available
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      const langPrefix = langMeta.code.split('-')[0].toLowerCase();
-      const matchingVoices = voices.filter((v) =>
-        v.lang.toLowerCase().startsWith(langPrefix)
-      );
-
-      if (matchingVoices.length > 0) {
-        // Prefer higher pitched / female / natural voice
-        const cuteVoice =
-          matchingVoices.find(
-            (v) =>
-              v.name.toLowerCase().includes('female') ||
-              v.name.toLowerCase().includes('google') ||
-              v.name.toLowerCase().includes('natural')
-          ) || matchingVoices[0];
-        utterance.voice = cuteVoice;
+    // Pick best matching warm, soft, natural voice for the target language
+    try {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices && voices.length > 0) {
+        const bestVoice = selectBestWarmVoice(voices, langMeta.code);
+        if (bestVoice) {
+          utterance.voice = bestVoice;
+        }
       }
+    } catch {
+      // Voice selection is optional fallback
     }
 
     let hasEnded = false;
+    let fallbackTimeout: any = null;
+
     const finish = () => {
       if (!hasEnded) {
         hasEnded = true;
+        if (fallbackTimeout) {
+          clearTimeout(fallbackTimeout);
+          fallbackTimeout = null;
+        }
+        if (keepAliveTimer) {
+          clearInterval(keepAliveTimer);
+          keepAliveTimer = null;
+        }
+        if (activeUtterance === utterance) {
+          activeUtterance = null;
+        }
         options?.onEnd?.();
       }
     };
 
     utterance.onstart = () => {
       options?.onStart?.();
+
+      // Chrome keep-alive: prevents Chrome from pausing long utterances after ~10 seconds
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
+      keepAliveTimer = setInterval(() => {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+          window.speechSynthesis.resume();
+        } else {
+          if (keepAliveTimer) {
+            clearInterval(keepAliveTimer);
+            keepAliveTimer = null;
+          }
+        }
+      }, 3500);
     };
 
     utterance.onend = () => {
@@ -130,20 +263,45 @@ export function speakHamsterVoice(
     };
 
     utterance.onerror = (e) => {
-      console.warn('SpeechSynthesis utterance error:', e);
+      console.warn('SpeechSynthesis utterance event:', e);
       options?.onError?.(e);
       finish();
     };
 
-    // Safety fallback: Some browsers (Chrome on Android/iOS) occasionally fail to fire onend
-    const estimatedDurationMs = Math.max(2000, text.length * 90);
-    setTimeout(() => {
+    // Safety fallback ONLY if speech never started or completely stalled and is not currently speaking
+    fallbackTimeout = setTimeout(() => {
       if (!hasEnded) {
+        if (typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.speaking) {
+          // Actively speaking, don't abort
+          return;
+        }
         finish();
       }
-    }, estimatedDurationMs + 1000);
+    }, Math.max(6000, text.length * 150));
 
-    window.speechSynthesis.speak(utterance);
+    // Retain global reference to avoid GC collection
+    activeUtterance = utterance;
+
+    const doSpeak = () => {
+      try {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.error('Error in window.speechSynthesis.speak:', err);
+        options?.onError?.(err);
+        finish();
+      }
+    };
+
+    // If currently speaking, safely cancel and queue after 35ms so Chrome's audio pipeline doesn't drop the new utterance
+    if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+      window.speechSynthesis.cancel();
+      setTimeout(doSpeak, 35);
+    } else {
+      doSpeak();
+    }
   } catch (err) {
     console.error('Error invoking speakHamsterVoice:', err);
     options?.onError?.(err);
@@ -155,6 +313,16 @@ export function speakHamsterVoice(
 export function stopHamsterSpeech(): void {
   if (isSpeechSynthesisSupported()) {
     try {
+      if (activeUtterance) {
+        activeUtterance.onstart = null;
+        activeUtterance.onend = null;
+        activeUtterance.onerror = null;
+        activeUtterance = null;
+      }
+      if (keepAliveTimer) {
+        clearInterval(keepAliveTimer);
+        keepAliveTimer = null;
+      }
       window.speechSynthesis.cancel();
     } catch {
       // Ignored
@@ -191,12 +359,15 @@ export function listenUserSpeech(
 
     let receivedResult = false;
     let latestTranscript = '';
+    let isStopped = false;
 
     recognition.onstart = () => {
+      if (isStopped) return;
       callbacks.onStart?.();
     };
 
     recognition.onresult = (event: any) => {
+      if (isStopped) return;
       let accumulated = '';
       for (let i = 0; i < event.results.length; i++) {
         accumulated += event.results[i][0].transcript;
@@ -210,7 +381,7 @@ export function listenUserSpeech(
       // Check for final result
       const lastResult = event.results[event.results.length - 1];
       if (lastResult && lastResult.isFinal) {
-        if (trimmed) {
+        if (trimmed && !receivedResult) {
           receivedResult = true;
           callbacks.onResult(trimmed);
         }
@@ -218,14 +389,18 @@ export function listenUserSpeech(
     };
 
     recognition.onerror = (event: any) => {
-      // Don't warn on intentional abort or no-speech if we already have a transcript
-      if (event.error === 'aborted' && latestTranscript) {
-        if (!receivedResult) {
-          receivedResult = true;
-          callbacks.onResult(latestTranscript);
-        }
+      if (isStopped) return;
+
+      // Intentional abort or stop should NEVER trigger onError
+      if (event.error === 'aborted') {
         return;
       }
+
+      // If we already captured a full result, do not trigger an error
+      if (receivedResult) {
+        return;
+      }
+
       console.warn('SpeechRecognition event:', event.error);
       let message = 'Could not hear clearly. Please try again or type!';
       if (event.error === 'not-allowed' || event.error === 'permission-denied') {
@@ -242,6 +417,7 @@ export function listenUserSpeech(
     };
 
     recognition.onend = () => {
+      if (isStopped) return;
       // If we got interim text but onend fired before isFinal, dispatch the latest transcript
       if (!receivedResult && latestTranscript) {
         receivedResult = true;
@@ -253,6 +429,8 @@ export function listenUserSpeech(
     recognition.start();
 
     const stopHandler = () => {
+      if (isStopped) return;
+      isStopped = true;
       try {
         if (latestTranscript && !receivedResult) {
           receivedResult = true;
@@ -265,6 +443,8 @@ export function listenUserSpeech(
     };
 
     const abortHandler = () => {
+      if (isStopped) return;
+      isStopped = true;
       try {
         recognition.abort();
       } catch {
@@ -331,8 +511,26 @@ export function getCuteHamsterAnswer(query: string, lang: TalkingLanguage, petNa
     if (/কৌতুক|হাসাও|মজার কথা|জোক|হাসি/.test(q)) {
       return `জানো হামস্টার কেন ব্যায়ামের চাকার ওপর দিনরাত দৌড়ায়? কারণ সে পৃথিবীর সেরা স্প্রিন্টার হয়ে তোমার কোলের কাছে সবার আগে পৌঁছাতে চায়! হিহিহি! 😆🎡`;
     }
-    if (/সূর্য|চাঁদ|আকাশ|বিজ্ঞান|কেন নীল|মহাকাশ|তারা|পৃথিবী/.test(q)) {
+    if (/সূর্য|চাঁদ|আকাশ|বিজ্ঞান|কেন নীল|মহাকাশ|তারা|পৃথিবী|সালোকসংশ্লেষ|পাতা সবুজ/.test(q)) {
+      if (/পাতা সবুজ|সালোকসংশ্লেষ/.test(q)) {
+        return `উদ্ভিদের পাতায় ক্লোরোফিল নামের সবুজ রঞ্জক থাকে যা সূর্যের আলো শোষণ করে সালোকসংশ্লেষ প্রক্রিয়ায় খাবার তৈরি করে, তাই পাতা সবুজ দেখায়! 🌿☀️`;
+      }
       return `মহাকাশের চমৎকার রহস্য! সূর্যের আলো বায়ুমণ্ডলের ক্ষুদ্র কণার সাথে ধাক্কা খেয়ে চারদিকে ছড়িয়ে পড়ে (রেলে স্ক্যাটারিং), তাই আকাশকে নীল দেখায়! কেমন লাগল তথ্যটি? 🌌🚀`;
+    }
+    if (/রাজধানী|ভারত|বাংলাদেশ|ফ্রান্স|আমেরিকা|জাপান|যুক্তরাষ্ট্র/.test(q)) {
+      if (/ভারত/.test(q)) return `ভারতের রাজধানী হলো নতুন দিল্লি! 🇮🇳✨`;
+      if (/বাংলাদেশ/.test(q)) return `বাংলাদেশের রাজধানী হলো ঢাকা, যা ঐতিহ্যে সমৃদ্ধ! 🇧🇩🏙️`;
+      if (/ফ্রান্স/.test(q)) return `ফ্রান্সের রাজধানী হলো প্যারিস, আইফেল টাওয়ারের শহর! 🇫🇷🗼`;
+      if (/জাপান/.test(q)) return `জাপানের রাজধানী টোকিও, আধুনিক প্রযুক্তির নগরী! 🇯🇵🌸`;
+      return `আমি বিশ্বের সব দেশের রাজধানী সম্পর্কে জানি! কোনো নির্দিষ্ট দেশের নাম বলুন! 🌍`;
+    }
+    if (/পাহাড়|পর্বত|নদী|এভারেস্ট|সবচেয়ে বড়|নীলনদ/.test(q)) {
+      if (/এভারেস্ট|পাহাড়|পর্বত/.test(q)) return `মাউন্ট এভারেস্ট পৃথিবীর সর্বোচ্চ পর্বতশৃঙ্গ, যার উচ্চতা প্রায় ৮,৮৪৮.৮৬ মিটার! 🏔️✨`;
+      if (/নদী|নীলনদ/.test(q)) return `নীলনদ পৃথিবীর অন্যতম দীর্ঘতম নদী এবং আমাজন অববাহিকা পানির দিক থেকে বৃহত্তম! 🌊🛶`;
+    }
+    if (/প্রাণী|বাঘ|তিমি|চিহ্ন|জাতীয়/.test(q)) {
+      if (/তিমি/.test(q)) return `নীল তিমি পৃথিবীর সবচেয়ে বড় প্রাণী, এটি প্রায় ৩০ মিটার লম্বা হতে পারে! 🐋🌊`;
+      return `প্রাণিজগৎ ভীষণ বৈচিত্র্যময়! আর আমি তোমার সবচেয়ে চঞ্চল ক্ষুদে পকেট বন্ধু! 🐹`;
     }
     if (/মন খারাপ|কষ্ট|ক্লান্ত|উদাস|সাহায্য|পরামর্শ/.test(q)) {
       return `একদম মন খারাপ করবে না বন্ধু! আমি তো সবসময় তোমার পাশে আছি! এক কাপ গরম চা বা জল খাও, গভীর শ্বাস নাও, আর আমার নরম গালটা স্পর্শ করো। সব ঠিক হয়ে যাবে! 🌸💕`;
@@ -341,14 +539,14 @@ export function getCuteHamsterAnswer(query: string, lang: TalkingLanguage, petNa
       return `পড়াশোনার সিক্রেট ট্রিক হলো পোমোডোরো টেকনিক: ২৫ মিনিট পুরো মনোযোগ দিয়ে পড়বে আর ৫ মিনিট বিশ্রাম নেবে! তুমি অবশ্যই দারুণ ফলাফল করবে, আমার পূর্ণ বিশ্বাস আছে! 📚🏆`;
     }
     if (/নাচ|গান|নাচো|গাও|মজা/.test(q)) {
-      return `আমি নাচতেও পারি আবার সুরেলা গানও গাইতে পারি! নিচের ড্যান্স বা সিং বোতামে চাপ দিয়ে আমার পারফরম্যান্স উপভোগ করো! 💃🎵`;
+      return `আমি নাচতেও পারি আবার সুরেলা গানও গাইতে পারি! আমার ড্যান্স ও সিং পারফরম্যান্স দারুণ উপভোগ্য! 💃🎵`;
     }
     if (/ঘুম|ঘুমাও|বিছানা|ক্লান্ত/.test(q)) {
       return `উফফ একটু হাই তুলছি... গোলাপি নরম বিছানায় কম্বল জড়িয়ে একটু ঘুমিয়ে নিলে আবার নতুন শক্তিতে লাফাতে পারব! 😴🛌`;
     }
 
     // Default Smart AI Friend response in Bengali
-    return `কিচমিচ! "${rawQ}"—দারুণ একটা কথা বললে! তোমার এআই বন্ধু হিসেবে আমি সবসময় তোমার সাথে ভাব বিনিময় করতে ভালোবাসি। চলো আরও নতুন বিষয় নিয়ে কথা বলি! 🐹💡💖`;
+    return `কিচমিচ! "${rawQ}"—দারুণ একটা প্রশ্ন! জ্ঞান বিজ্ঞানের যেকোনো বিষয়ে আমাকে জিজ্ঞাসা করতে পারো, আমি উত্তর দেব! 🐹💡💖`;
   }
 
   // HINDI [HI]
@@ -368,8 +566,27 @@ export function getCuteHamsterAnswer(query: string, lang: TalkingLanguage, petNa
     if (/जोक|चुटकुला|हंसाओ|मजाक|हंसी/.test(q)) {
       return `हैमस्टर गोल पहिये पर इतनी तेजी से क्यों भागता है? ताकि वह सुपर-फास्ट रॉकेट बनकर सबसे पहले तुम्हारी गोदी में कूद सके! हीहीही! 🚀🎡😆`;
     }
-    if (/सूर्य|चांद|आकाश|विज्ञान|नीला|तारे|अंतरिक्ष|पृथ्वी/.test(q)) {
+    if (/सूर्य|चांद|आकाश|विज्ञान|नीला|तारे|अंतरिक्ष|पृथ्वी|प्रकाशसंश्लेषण|पत्ते हरे/.test(q)) {
+      if (/पत्ते हरे|पेड़|पौधे/.test(q)) {
+        return `पत्तियों में क्लोरोफिल नाम का हरा वर्णक होता है जो सूर्य के प्रकाश से भोजन बनाता है, इसलिए पत्तियां हरी दिखती हैं! 🌿☀️`;
+      }
       return `शानदार विज्ञान तथ्य! सूरज की रोशनी जब हमारे वायुमंडल से टकराती है, तो नीली रोशनी सबसे ज्यादा बिखरती है (रेले प्रकीर्णन), इसलिए हमें आसमान नीला दिखाई देता है! 🌌✨`;
+    }
+    if (/राजधानी|भारत|फ्रांस|अमेरिका|जापान|बांग्लादेश/.test(q)) {
+      if (/भारत/.test(q)) return `भारत की राजधानी नई दिल्ली है! 🇮🇳✨`;
+      if (/फ्रांस/.test(q)) return `फ्रांस की राजधानी पेरिस है, जिसे एफिल टॉवर का शहर कहते हैं! 🇫🇷🗼`;
+      if (/जापान/.test(q)) return `जापान की राजधानी टोक्यो है! 🇯🇵🌸`;
+      if (/अमेरिका/.test(q)) return `संयुक्त राज्य अमेरिका की राजधानी वॉशिंगटन डी.सी. है! 🇺🇸🏛️`;
+      if (/बांग्लादेश/.test(q)) return `बांग्लादेश की राजधानी ढाका है! 🇧🇩🏙️`;
+      return `मैं दुनिया भर की राजधानियों के बारे में जानता हूँ, किसी भी देश का नाम पूछिए! 🌍`;
+    }
+    if (/पहाड़|पर्वत|एवरेस्ट|नदी|गंगा|नील/.test(q)) {
+      if (/एवरेस्ट/.test(q)) return `माउंट एवरेस्ट दुनिया का सबसे ऊँचा पर्वत शिखर है (ऊंचाई लगभग 8,848.86 मीटर)! 🏔️⭐`;
+      if (/गंगा|नदी|नील/.test(q)) return `नील नदी विश्व की सबसे लंबी नदी है और गंगा भारत की सबसे पवित्र व महत्वपूर्ण नदी है! 🌊`;
+    }
+    if (/जानवर|व्हेल|चीता|हाथी/.test(q)) {
+      if (/व्हेल/.test(q)) return `ब्लू व्हेल पृथ्वी का सबसे बड़ा जीव है, यह 30 मीटर तक लंबा हो सकता है! 🐋`;
+      if (/चीता/.test(q)) return `चीता ज़मीन पर सबसे तेज़ दौड़ने वाला जानवर है, जो 100 किमी/घंटा से भी तेज़ भाग सकता है! 🐆`;
     }
     if (/उदास|दुखी|तनाव|थक|मदद|सलाह/.test(q)) {
       return `उदासी को कहो अलविदा दोस्त! मैं हमेशा तुम्हारे साथ हूँ। एक गहरी सांस लो, थोड़ा पानी पियो, और मुस्कुराओ। तुम बहुत खास और मजबूत इंसान हो! 🌸💕`;
@@ -378,14 +595,14 @@ export function getCuteHamsterAnswer(query: string, lang: TalkingLanguage, petNa
       return `पढ़ाई का गोल्डन रूल: हर 25 मिनट पढ़ाई के बाद 5 मिनट का छोटा ब्रेक लो (पोमोडोरो तकनीक)! तुम परीक्षा में कमाल करोगे, मुझे पूरा यकीन है! 📚⭐`;
     }
     if (/नाच|गाना|नाचो|गाओ|डांस/.test(q)) {
-      return `मुझे डांस करना और गाना गाना बहुत पसंद है! नीचे डांस या सिंग बटन दबाकर मेरी 360 डिग्री छलांग और मधुर गीत का आनंद लो! 💃🎵`;
+      return `मुझे डांस करना और गाना गाना बहुत पसंद है! मेरी 360 डिग्री छलांग और मधुर गीत का आनंद लो! 💃🎵`;
     }
     if (/सोना|नींद|बिस्तर|सोओगे/.test(q)) {
       return `उबासी आ रही है... अपने प्यारे मुलायम बिस्तर पर मीठे सपनों में खो जाने का मन कर रहा है! 😴🛌`;
     }
 
     // Default Smart AI Friend response in Hindi
-    return `चीं-चीं! "${rawQ}"—बहुत ही बढ़िया बात पूछी तुमने! तुम्हारा स्मार्ट एआई साथी होने के नाते मुझे तुमसे बातें करके बहुत खुशी होती है। और क्या जानना चाहते हो? 🐹💡💖`;
+    return `चीं-चीं! "${rawQ}"—बहुत ही बढ़िया सवाल है! मुझसे विज्ञान, गणित, दुनिया के तथ्य या कोई भी ज्ञानवर्धक बात पूछो, मैं तुरंत जवाब दूँगा! 🐹💡💖`;
   }
 
   // ENGLISH [EN]
@@ -404,15 +621,34 @@ export function getCuteHamsterAnswer(query: string, lang: TalkingLanguage, petNa
   if (/joke|funny|laugh|humor|pun/.test(q)) {
     return `Why did the hamster build an exercise wheel rocket? Because it wanted to visit the milky way for cheese and sunflower seeds! Hehehe! 🚀🧀😆`;
   }
-  if (/sky blue|why is the sky blue|science|space|sun|moon|stars|earth|gravity/.test(q)) {
+  if (/sky blue|why is the sky blue|science|space|sun|moon|stars|earth|gravity|photosynthesis|leaves green/.test(q)) {
+    if (/photosynthesis|leaves green/.test(q)) {
+      return `Plants look green because they contain chlorophyll, a pigment that absorbs red and blue light from the sun and reflects green light while making plant food! 🌿☀️`;
+    }
+    if (/speed of light/.test(q)) {
+      return `Light travels at approximately 299,792 kilometers per second (about 186,282 miles per second) in a vacuum! That's lightning fast! ⚡✨`;
+    }
     return `Here is a cool science fact! Sunlight scatters through gases in Earth's atmosphere. Because blue light travels in smaller, shorter waves, it scatters more than other colors, making the sky look blue! Isn't physics awesome? 🌌🔭`;
   }
-  if (/capital of france|capital of india|capital of bangladesh|capital of usa|capital of japan/.test(q)) {
+  if (/capital of france|capital of india|capital of bangladesh|capital of usa|capital of japan|capital of germany|capital of uk|capital of canada|capital of australia/.test(q)) {
     if (/france/.test(q)) return `The capital of France is Paris, famous for the Eiffel Tower and delicious croissants! 🥐🗼`;
     if (/india/.test(q)) return `The capital of India is New Delhi, rich with incredible culture and heritage! 🇮🇳✨`;
     if (/bangladesh/.test(q)) return `The capital of Bangladesh is Dhaka, famous for its historic landmarks and vibrant life! 🇧🇩🏙️`;
     if (/usa|united states/.test(q)) return `The capital of the United States is Washington, D.C.! 🇺🇸🏛️`;
     if (/japan/.test(q)) return `The capital of Japan is Tokyo, known for futuristic technology and cherry blossoms! 🇯🇵🌸`;
+    if (/germany/.test(q)) return `The capital of Germany is Berlin! 🇩🇪🏛️`;
+    if (/uk|united kingdom|england/.test(q)) return `The capital of the United Kingdom is London! 🇬🇧🏰`;
+    if (/canada/.test(q)) return `The capital of Canada is Ottawa! 🇨🇦🍁`;
+    if (/australia/.test(q)) return `The capital of Australia is Canberra! 🇦🇺🦘`;
+  }
+  if (/animal|fastest animal|largest animal|blue whale|cheetah|elephant/.test(q)) {
+    if (/blue whale|largest/.test(q)) return `The blue whale is the largest animal ever known to have lived on Earth, weighing up to 200 tons! 🐋🌊`;
+    if (/cheetah|fastest/.test(q)) return `The cheetah is the fastest land animal, accelerating from 0 to 60 mph in just 3 seconds! 🐆⚡`;
+    return `Animals are truly incredible, and hamsters like me have cheek pouches that can stretch up to three times the size of our heads! 🐹`;
+  }
+  if (/mountain|highest mountain|everest|longest river|nile|amazon/.test(q)) {
+    if (/everest|mountain/.test(q)) return `Mount Everest is the highest mountain above sea level, standing at 8,848.86 meters (29,031.7 feet)! 🏔️✨`;
+    if (/nile|amazon|river/.test(q)) return `The Nile is traditionally recognized as the longest river in the world, while the Amazon has the largest water flow! 🌊⛵`;
   }
   if (/sad|lonely|depressed|stress|tired|advice|help me/.test(q)) {
     return `Hey, please remember you are never alone—I'm right here in your pocket cheering for you! Take a gentle deep breath, sip some fresh water, and give yourself credit for how hard you try. Everything will be okay! 🌸💕`;
@@ -421,13 +657,13 @@ export function getCuteHamsterAnswer(query: string, lang: TalkingLanguage, petNa
     return `Pro productivity tip: Try the Pomodoro Technique! Study focused for 25 minutes, then take a 5-minute reward break. Hydrate and keep a positive mindset—you've got this! 📚🌟`;
   }
   if (/dance|sing|talent|music|song/.test(q)) {
-    return `I'm a superstar performer! Tap my Dance button for 360-spin aerial flips or Sing for my synthesized melody! 💃🎵`;
+    return `I'm a superstar performer! I can dance with 360-spin aerial flips or sing cute synthesized melodies! 💃🎵`;
   }
   if (/sleep|nap|bed|tired/.test(q)) {
     return `Yaaawn... A cozy nap in my fluffy pink bed sounds heavenly right now! Don't forget to get good sleep too! 😴🛌`;
   }
 
   // Open-domain Smart AI Friend fallback
-  return `Squeak! That's a great thought: "${rawQ}"! As your smart AI hamster companion, I love exploring interesting ideas with you. What should we talk about or discover next? 🐹💡✨`;
+  return `Squeak! That's a great question: "${rawQ}"! As your smart knowledge hamster buddy, I love sharing fun science, math, and general facts with you. What would you like to explore next? 🐹💡✨`;
 }
 

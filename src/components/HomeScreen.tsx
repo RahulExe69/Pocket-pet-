@@ -1,11 +1,38 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Gift, Sparkles, ShoppingBag, Shirt, X, ChevronRight, Users, Gamepad2, Mic, MessageCircle, RotateCcw, Volume2 } from 'lucide-react';
+import {
+  Settings,
+  Gift,
+  Sparkles,
+  ShoppingBag,
+  Shirt,
+  X,
+  ChevronRight,
+  Users,
+  Gamepad2,
+  Mic,
+  MessageCircle,
+  RotateCcw,
+  Volume2,
+  Bot,
+  HelpCircle,
+  Keyboard,
+  Square,
+} from 'lucide-react';
 import { PetState, PetMood, FoodItem, MultiplayerRoom, MultiplayerPlayer, MultiplayerMiniGameType } from '../types';
 import { PetScene3D } from './3d/PetScene3D';
 import { SpeechBubble } from './SpeechBubble';
 import { HamsterTalkModal } from './HamsterTalkModal';
-import { TalkingLanguage, SUPPORTED_LANGUAGES, speakHamsterVoice } from '../utils/speech';
+import {
+  TalkingLanguage,
+  SUPPORTED_LANGUAGES,
+  speakHamsterVoice,
+  stopHamsterSpeech,
+  listenUserSpeech,
+  getCuteHamsterAnswer,
+  isSpeechRecognitionSupported,
+} from '../utils/speech';
+import { askGeminiHamster, ChatHistoryItem } from '../services/gemini';
 import { soundManager } from '../utils/audio';
 
 interface HomeScreenProps {
@@ -125,12 +152,206 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [singTrigger, setSingTrigger] = useState<{ timestamp: number } | null>(null);
   const [petIdCopied, setPetIdCopied] = useState<boolean>(false);
   const [selectedLanguage, setSelectedLanguage] = useState<TalkingLanguage>('EN');
-  const [talkingModalMode, setTalkingModalMode] = useState<'repeat' | 'chat' | null>(null);
+  const [talkingModalMode, setTalkingModalMode] = useState<'repeat' | 'answer' | 'chat' | null>(null);
   const [isTalking, setIsTalking] = useState<boolean>(false);
   const [localSpeechMessage, setLocalSpeechMessage] = useState<string | null>(null);
   const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Hamster high-pitched voice speech handler with animated mouth & bubble
+  // Direct Voice Interaction States for Button 1 (REPEAT) & Button 2 (ANSWER)
+  const [directVoiceMode, setDirectVoiceMode] = useState<'repeat' | 'answer' | null>(null);
+  const [isDirectListening, setIsDirectListening] = useState<boolean>(false);
+  const [isAnswerThinking, setIsAnswerThinking] = useState<boolean>(false);
+  const directSpeechControllerRef = useRef<{ stop: () => void; abort: () => void } | null>(null);
+  const geminiHistoryRef = useRef<ChatHistoryItem[]>([]);
+
+  // Continuous Repeat Mode states (listen -> repeat -> listen automatically until Stop is pressed)
+  const [isContinuousRepeat, setIsContinuousRepeat] = useState<boolean>(false);
+  const [repeatPhase, setRepeatPhase] = useState<'idle' | 'listening' | 'speaking'>('idle');
+  const repeatPhaseRef = useRef<'idle' | 'listening' | 'speaking'>('idle');
+  const isContinuousRepeatRef = useRef<boolean>(false);
+  const repeatCycleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const updateRepeatPhase = (phase: 'idle' | 'listening' | 'speaking') => {
+    repeatPhaseRef.current = phase;
+    setRepeatPhase(phase);
+  };
+
+  const stopDirectSpeech = () => {
+    if (directSpeechControllerRef.current) {
+      directSpeechControllerRef.current.abort();
+      directSpeechControllerRef.current = null;
+    }
+    setIsDirectListening(false);
+    setDirectVoiceMode(null);
+    setIsAnswerThinking(false);
+  };
+
+  // Stop Continuous Repeat Mode immediately
+  const stopContinuousRepeat = () => {
+    isContinuousRepeatRef.current = false;
+    setIsContinuousRepeat(false);
+    updateRepeatPhase('idle');
+
+    if (repeatCycleTimeoutRef.current) {
+      clearTimeout(repeatCycleTimeoutRef.current);
+      repeatCycleTimeoutRef.current = null;
+    }
+
+    if (directSpeechControllerRef.current) {
+      directSpeechControllerRef.current.abort();
+      directSpeechControllerRef.current = null;
+    }
+
+    stopHamsterSpeech();
+    setIsDirectListening(false);
+    setIsTalking(false);
+    setDirectVoiceMode(null);
+    setLocalSpeechMessage(null);
+    soundManager.playPop();
+  };
+
+  // Continuous Repeat Cycle: strictly avoids mic and speech overlap
+  const startContinuousListeningCycle = () => {
+    if (!isContinuousRepeatRef.current) return;
+    if (repeatPhaseRef.current === 'speaking') return; // NEVER interrupt active speaking!
+
+    if (repeatCycleTimeoutRef.current) {
+      clearTimeout(repeatCycleTimeoutRef.current);
+      repeatCycleTimeoutRef.current = null;
+    }
+
+    // 1. Strictly stop any playing speech or previous mic before listening
+    stopHamsterSpeech();
+    if (directSpeechControllerRef.current) {
+      directSpeechControllerRef.current.abort();
+      directSpeechControllerRef.current = null;
+    }
+
+    setIsTalking(false);
+    updateRepeatPhase('listening');
+    setIsDirectListening(true);
+    setDirectVoiceMode('repeat');
+    setLocalSpeechMessage('Listening...');
+
+    const controller = listenUserSpeech(selectedLanguage, {
+      onStart: () => {
+        if (!isContinuousRepeatRef.current) {
+          controller.abort();
+          return;
+        }
+        setIsDirectListening(true);
+        setDirectVoiceMode('repeat');
+        updateRepeatPhase('listening');
+        setLocalSpeechMessage('Listening...');
+      },
+      onInterim: (interim) => {
+        if (!isContinuousRepeatRef.current) return;
+        setLocalSpeechMessage(`Listening... "${interim}"`);
+      },
+      onResult: (finalText) => {
+        if (!isContinuousRepeatRef.current) return;
+        const cleaned = finalText.trim();
+
+        if (!cleaned) {
+          // If silence or empty result, continue listening
+          if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+            repeatCycleTimeoutRef.current = setTimeout(() => {
+              if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+                startContinuousListeningCycle();
+              }
+            }, 300);
+          }
+          return;
+        }
+
+        // 2. Automatically detect end of speech -> Immediately close mic to PREVENT ANY OVERLAP!
+        if (directSpeechControllerRef.current) {
+          directSpeechControllerRef.current.abort();
+          directSpeechControllerRef.current = null;
+        }
+        setIsDirectListening(false);
+        setDirectVoiceMode(null);
+
+        // 3. Transition to Speaking phase: hamster repeats exact words without modification
+        updateRepeatPhase('speaking');
+        setLocalSpeechMessage(`Speaking... "${cleaned}"`);
+        setIsTalking(true);
+
+        speakHamsterVoice(cleaned, selectedLanguage, {
+          onStart: () => {
+            setIsTalking(true);
+            updateRepeatPhase('speaking');
+            setLocalSpeechMessage(`Speaking... "${cleaned}"`);
+          },
+          onEnd: () => {
+            setIsTalking(false);
+            // 4. After hamster finishes speaking, automatically start listening again!
+            if (isContinuousRepeatRef.current) {
+              updateRepeatPhase('listening');
+              setLocalSpeechMessage('Listening...');
+              // Small cooldown so speaker sound doesn't echo into mic
+              repeatCycleTimeoutRef.current = setTimeout(() => {
+                if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+                  startContinuousListeningCycle();
+                }
+              }, 400);
+            }
+          },
+          onError: () => {
+            setIsTalking(false);
+            if (isContinuousRepeatRef.current) {
+              updateRepeatPhase('listening');
+              repeatCycleTimeoutRef.current = setTimeout(() => {
+                if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+                  startContinuousListeningCycle();
+                }
+              }, 450);
+            }
+          },
+        });
+      },
+      onError: (errMsg) => {
+        setIsDirectListening(false);
+        setDirectVoiceMode(null);
+        directSpeechControllerRef.current = null;
+
+        if (!isContinuousRepeatRef.current) return;
+        // If hamster is already in speaking phase, do NOT interrupt TTS or restart listening!
+        if (repeatPhaseRef.current === 'speaking') return;
+
+        if (errMsg.includes('Microphone access was denied') || errMsg.includes('not-allowed')) {
+          setLocalSpeechMessage('Microphone access denied. Please allow mic in browser!');
+          stopContinuousRepeat();
+          setTalkingModalMode('repeat');
+          return;
+        }
+
+        // On transient silence/no-speech or timeout, seamlessly resume listening
+        repeatCycleTimeoutRef.current = setTimeout(() => {
+          if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+            startContinuousListeningCycle();
+          }
+        }, 400);
+      },
+      onEnd: () => {
+        setIsDirectListening(false);
+        directSpeechControllerRef.current = null;
+
+        // If recognition ended without speaking, resume listening
+        if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+          repeatCycleTimeoutRef.current = setTimeout(() => {
+            if (isContinuousRepeatRef.current && repeatPhaseRef.current !== 'speaking') {
+              startContinuousListeningCycle();
+            }
+          }, 350);
+        }
+      },
+    });
+
+    directSpeechControllerRef.current = controller;
+  };
+
+  // Hamster high-pitched voice speech handler with animated mouth & bubble (pitch 1.8)
   const handleHamsterSpeak = (text: string, lang: TalkingLanguage, userTextFirst?: string) => {
     if (speechTimeoutRef.current) {
       clearTimeout(speechTimeoutRef.current);
@@ -141,7 +362,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       // 1) Show user text in speech bubble first!
       setLocalSpeechMessage(`You: "${userTextFirst}"`);
       speechTimeoutRef.current = setTimeout(() => {
-        // 2) Hamster repeats same in cute high pitch 1.6 with mouth open animation and speechSynthesis
+        // 2) Hamster repeats or answers in cute high pitch 1.8 with mouth open animation and speechSynthesis
         setLocalSpeechMessage(`"${text}"`);
         setIsTalking(true);
 
@@ -153,13 +374,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             setIsTalking(false);
             speechTimeoutRef.current = setTimeout(() => {
               setLocalSpeechMessage(null);
-            }, 5000);
+            }, 6000);
           },
           onError: () => {
             setIsTalking(false);
           },
         });
-      }, 1200);
+      }, 1000);
     } else {
       setLocalSpeechMessage(text);
       setIsTalking(true);
@@ -172,7 +393,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           setIsTalking(false);
           speechTimeoutRef.current = setTimeout(() => {
             setLocalSpeechMessage(null);
-          }, 5000);
+          }, 6000);
         },
         onError: () => {
           setIsTalking(false);
@@ -182,21 +403,219 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const handleLanguageSelect = (lang: TalkingLanguage) => {
+    if (isContinuousRepeatRef.current) {
+      stopContinuousRepeat();
+    }
     setSelectedLanguage(lang);
     soundManager.playPop();
     const greeting = SUPPORTED_LANGUAGES[lang].defaultGreeting;
     handleHamsterSpeak(greeting, lang);
   };
 
+  // Button 1 = REPEAT: One tap activates Continuous Repeat Mode!
+  const handleDirectRepeat = () => {
+    soundManager.playPop();
+
+    if (isContinuousRepeat) {
+      // Tap again toggles/stops Continuous Repeat Mode
+      stopContinuousRepeat();
+      return;
+    }
+
+    // Stop answer mode if active
+    stopDirectSpeech();
+
+    // Activate Continuous Repeat Mode
+    isContinuousRepeatRef.current = true;
+    setIsContinuousRepeat(true);
+    startContinuousListeningCycle();
+  };
+
+  // Button 2 = ANSWER: User speaks question, automatically detects when speech finishes, sends to Gemini, answers smartly with context in BN/HI/EN!
+  const handleDirectAnswer = () => {
+    soundManager.playPop();
+
+    // 1. If Continuous Repeat Mode is active, stop it cleanly
+    if (isContinuousRepeatRef.current) {
+      stopContinuousRepeat();
+    }
+
+    // 2. If user taps Answer while already listening or thinking, toggle/cancel
+    if ((isDirectListening && directVoiceMode === 'answer') || isAnswerThinking) {
+      if (directSpeechControllerRef.current) {
+        directSpeechControllerRef.current.abort();
+        directSpeechControllerRef.current = null;
+      }
+      setIsDirectListening(false);
+      setDirectVoiceMode(null);
+      setIsAnswerThinking(false);
+      setLocalSpeechMessage(null);
+      return;
+    }
+
+    stopDirectSpeech();
+    stopHamsterSpeech();
+    setIsTalking(false);
+
+    const promptText =
+      selectedLanguage === 'BN'
+        ? '❓ শুনছি... যেকোনো প্রশ্ন করুন!'
+        : selectedLanguage === 'HI'
+        ? '❓ सुन रहा हूँ... कोई भी सवाल पूछिए!'
+        : '❓ Listening... Ask your question!';
+    setLocalSpeechMessage(promptText);
+    setIsDirectListening(true);
+    setDirectVoiceMode('answer');
+    setIsAnswerThinking(false);
+
+    const controller = listenUserSpeech(selectedLanguage, {
+      onStart: () => {
+        setIsDirectListening(true);
+        setDirectVoiceMode('answer');
+        setIsAnswerThinking(false);
+      },
+      onInterim: (interim) => {
+        setLocalSpeechMessage(`Listening: "${interim}"`);
+      },
+      onResult: async (finalQuestion) => {
+        // Automatically detected end of user speech!
+        // Immediately shut off microphone recognition to prevent any overlap
+        if (directSpeechControllerRef.current) {
+          directSpeechControllerRef.current.stop();
+          directSpeechControllerRef.current = null;
+        }
+        setIsDirectListening(false);
+        setDirectVoiceMode(null);
+
+        const cleaned = finalQuestion.trim();
+        if (!cleaned) {
+          setLocalSpeechMessage(null);
+          return;
+        }
+
+        // Show question and thinking state in speech bubble
+        const thinkingLabel =
+          selectedLanguage === 'BN'
+            ? '🐹 ভাবছি...'
+            : selectedLanguage === 'HI'
+            ? '🐹 सोच रहा हूँ...'
+            : '🐹 Thinking...';
+        setLocalSpeechMessage(`You: "${cleaned}"\n${thinkingLabel}`);
+        setIsAnswerThinking(true);
+
+        try {
+          // Send complete question to Gemini with conversation context
+          const geminiAnswer = await askGeminiHamster(
+            cleaned,
+            geminiHistoryRef.current,
+            selectedLanguage,
+            pet.name
+          );
+
+          // Maintain conversation context so follow-up questions work naturally
+          geminiHistoryRef.current.push({ role: 'user', text: cleaned });
+          geminiHistoryRef.current.push({ role: 'model', text: geminiAnswer });
+          if (geminiHistoryRef.current.length > 16) {
+            geminiHistoryRef.current = geminiHistoryRef.current.slice(-16);
+          }
+
+          setIsAnswerThinking(false);
+
+          // Show question and answer in the speech bubble
+          const displayBubbleText = `You: "${cleaned}"\n🐹: ${geminiAnswer}`;
+          setLocalSpeechMessage(displayBubbleText);
+
+          // Make the hamster speak the answer automatically (no second tap required)
+          if (speechTimeoutRef.current) {
+            clearTimeout(speechTimeoutRef.current);
+            speechTimeoutRef.current = null;
+          }
+
+          setIsTalking(true);
+          speakHamsterVoice(geminiAnswer, selectedLanguage, {
+            onStart: () => {
+              setIsTalking(true);
+            },
+            onEnd: () => {
+              setIsTalking(false);
+              // Keep question & answer visible in speech bubble for easy reading
+              speechTimeoutRef.current = setTimeout(() => {
+                setLocalSpeechMessage(null);
+              }, 12000);
+            },
+            onError: () => {
+              setIsTalking(false);
+            },
+          });
+        } catch (err) {
+          console.error('Failed to generate answer from Gemini:', err);
+          setIsAnswerThinking(false);
+          const fallbackAnswer = getCuteHamsterAnswer(cleaned, selectedLanguage, pet.name);
+          setLocalSpeechMessage(`You: "${cleaned}"\n🐹: ${fallbackAnswer}`);
+          setIsTalking(true);
+          speakHamsterVoice(fallbackAnswer, selectedLanguage, {
+            onStart: () => {
+              setIsTalking(true);
+            },
+            onEnd: () => {
+              setIsTalking(false);
+              speechTimeoutRef.current = setTimeout(() => {
+                setLocalSpeechMessage(null);
+              }, 10000);
+            },
+            onError: () => {
+              setIsTalking(false);
+            },
+          });
+        }
+      },
+      onError: () => {
+        setIsDirectListening(false);
+        setDirectVoiceMode(null);
+        setIsAnswerThinking(false);
+        directSpeechControllerRef.current = null;
+        // Fallback: open modal for typing if mic is blocked/unsupported
+        setTalkingModalMode('answer');
+      },
+      onEnd: () => {
+        setIsDirectListening(false);
+        setDirectVoiceMode(null);
+        directSpeechControllerRef.current = null;
+      },
+    });
+
+    directSpeechControllerRef.current = controller;
+  };
+
   const handleRepeatClick = () => {
+    if (isContinuousRepeatRef.current) {
+      stopContinuousRepeat();
+    }
     soundManager.playPop();
     setTalkingModalMode('repeat');
   };
 
   const handleChatClick = () => {
+    if (isContinuousRepeatRef.current) {
+      stopContinuousRepeat();
+    }
     soundManager.playPop();
-    setTalkingModalMode('chat');
+    setTalkingModalMode('answer');
   };
+
+  // Cleanup continuous repeat and audio on unmount
+  React.useEffect(() => {
+    return () => {
+      isContinuousRepeatRef.current = false;
+      if (repeatCycleTimeoutRef.current) {
+        clearTimeout(repeatCycleTimeoutRef.current);
+      }
+      if (directSpeechControllerRef.current) {
+        directSpeechControllerRef.current.abort();
+      }
+      stopHamsterSpeech();
+    };
+  }, []);
 
   const [statNotice, setStatNotice] = useState<{
     text: string;
@@ -673,8 +1092,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         )}
 
         {/* Floating Speech Bubble Above 3D Pet */}
-        <div className="absolute top-2 left-0 right-0 pointer-events-none z-20 flex justify-center px-4">
-          <div className="pointer-events-auto max-w-[280px]">
+        <div className="absolute top-2 left-0 right-0 pointer-events-none z-20 flex justify-center px-3">
+          <div className="pointer-events-auto max-w-[340px] sm:max-w-[420px] w-full flex justify-center">
             <SpeechBubble
               mood={mood}
               customMessage={localSpeechMessage || customSpeechMessage}
@@ -833,97 +1252,168 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         )}
       </AnimatePresence>
 
-      {/* 2 TALKING ACTION BUTTONS: REPEAT (TAB 1) & CHAT GPT (TAB 2) */}
-      <div className="relative z-20 px-3 pt-0 pb-1 flex items-center justify-center gap-2">
-        {/* 1) Repeat Button (Tab 1) */}
-        <button
-          id="btn-action-repeat"
-          onClick={handleRepeatClick}
-          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer bg-gradient-to-r from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 text-stone-800 border-pink-300 hover:border-pink-400 hover:shadow-md group"
-          title="Hold big mic to speak, hamster repeats same in cute high pitch 1.6!"
-        >
-          <div className="p-1.5 rounded-xl bg-pink-500 text-white shadow-xs group-hover:scale-110 transition-transform">
-            <RotateCcw size={15} />
-          </div>
-          <div className="flex flex-col text-left leading-tight">
-            <div className="flex items-center gap-1">
-              <span className="text-xs font-bold font-bubble">Repeat</span>
-              <span className="text-[9px] bg-pink-100 text-pink-700 px-1 rounded-sm font-mono font-bold">
-                [{selectedLanguage}]
+      {/* 2 MAIN ACTION BUTTONS: BUTTON 1 = REPEAT & BUTTON 2 = ANSWER */}
+      <div className="relative z-20 px-3 pt-0 pb-1.5 flex items-stretch justify-center gap-2">
+        {/* BUTTON 1 = REPEAT */}
+        <div className="flex-1 flex items-stretch">
+          <button
+            id="btn-action-repeat"
+            onClick={handleDirectRepeat}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none ${
+              isContinuousRepeat
+                ? repeatPhase === 'speaking'
+                  ? 'bg-gradient-to-r from-amber-500 via-pink-500 to-rose-500 text-white border-pink-400 ring-4 ring-pink-300/80 shadow-lg scale-[1.01]'
+                  : 'bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white border-pink-400 ring-4 ring-pink-300/80 shadow-lg scale-[1.01] animate-pulse'
+                : 'bg-gradient-to-r from-pink-50 via-white to-rose-50 hover:from-pink-100 hover:to-rose-100 text-stone-800 border-pink-300 hover:border-pink-400 hover:shadow-lg'
+            }`}
+            title={
+              isContinuousRepeat
+                ? 'Continuous Repeat Active - Tap to Stop'
+                : 'Button 1: REPEAT - Tap once for Continuous Repeat Mode (auto listen & repeat)!'
+            }
+          >
+            <div
+              className={`p-2 rounded-xl transition-transform shrink-0 ${
+                isContinuousRepeat
+                  ? 'bg-white text-pink-600 shadow-md scale-110'
+                  : 'bg-pink-500 text-white shadow-xs'
+              }`}
+            >
+              {isContinuousRepeat ? (
+                repeatPhase === 'speaking' ? (
+                  <Volume2 className="animate-bounce" size={17} />
+                ) : (
+                  <Mic className="animate-bounce" size={17} />
+                )
+              ) : (
+                <RotateCcw size={17} />
+              )}
+            </div>
+            <div className="flex flex-col text-left leading-tight min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-wide whitespace-nowrap">
+                  {isContinuousRepeat
+                    ? repeatPhase === 'speaking'
+                      ? 'Speaking...'
+                      : 'Listening...'
+                    : 'Button 1: REPEAT'}
+                </span>
+                <span className="text-[9px] bg-pink-100/90 text-pink-700 px-1 py-0.5 rounded font-mono font-bold">
+                  [{selectedLanguage}]
+                </span>
+              </div>
+              <span
+                className={`text-[10px] sm:text-[11px] font-bubble truncate ${
+                  isContinuousRepeat ? 'text-pink-100 font-bold' : 'text-pink-600'
+                }`}
+              >
+                {isContinuousRepeat
+                  ? repeatPhase === 'speaking'
+                    ? 'Hamster repeating 🐹'
+                    : 'Speak anytime 🎙️'
+                  : 'Continuous Voice 🎙️'}
               </span>
             </div>
-            <span className="text-[10px] font-bubble text-pink-600">Voice Mimic 🎙️</span>
-          </div>
-        </button>
+          </button>
 
-        {/* 2) Chat GPT Button (Tab 2) */}
-        <button
-          id="btn-action-chatgpt"
-          onClick={handleChatClick}
-          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-stone-800 border-purple-300 hover:border-purple-400 hover:shadow-md group"
-          title="ChatGPT-like AI Friend: Ask questions in BN, HI, EN, get smart cute voice answers!"
-        >
-          <div className="p-1.5 rounded-xl bg-purple-600 text-white shadow-xs group-hover:scale-110 transition-transform">
-            <MessageCircle size={15} />
-          </div>
-          <div className="flex flex-col text-left leading-tight">
-            <div className="flex items-center gap-1">
-              <span className="text-xs font-bold font-bubble">Chat GPT</span>
-              <span className="text-[9px] bg-purple-100 text-purple-700 px-1 rounded-sm font-mono font-bold">
-                [{selectedLanguage}]
+          {/* Small Stop Control (appears while Continuous Repeat Mode is active) */}
+          <AnimatePresence>
+            {isContinuousRepeat && (
+              <motion.button
+                id="btn-stop-repeat"
+                initial={{ scale: 0.7, opacity: 0, width: 0 }}
+                animate={{ scale: 1, opacity: 1, width: 'auto' }}
+                exit={{ scale: 0.7, opacity: 0, width: 0 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  stopContinuousRepeat();
+                }}
+                className="ml-1 px-2.5 flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-bubble font-bold text-xs shadow-md border border-red-400 active:scale-90 transition-transform cursor-pointer select-none"
+                title="Stop Continuous Repeat Mode"
+              >
+                <Square size={11} fill="currentColor" />
+                <span className="text-[10px] uppercase tracking-wider font-extrabold whitespace-nowrap">Stop</span>
+              </motion.button>
+            )}
+          </AnimatePresence>
+
+          <button
+            onClick={handleRepeatClick}
+            title="Type text for hamster to repeat"
+            className="ml-1 px-2 flex items-center justify-center rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300 shadow-xs cursor-pointer active:scale-95 transition-transform"
+          >
+            <Keyboard size={14} />
+          </button>
+        </div>
+
+        {/* BUTTON 2 = ANSWER */}
+        <div className="flex-1 flex items-stretch">
+          <button
+            id="btn-action-answer"
+            onClick={handleDirectAnswer}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none ${
+              (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400 ring-4 ring-purple-300/80 shadow-lg scale-[1.02] animate-pulse'
+                : 'bg-gradient-to-r from-purple-50 via-white to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-stone-800 border-purple-300 hover:border-purple-400 hover:shadow-lg'
+            }`}
+            title="Button 2: ANSWER - Tap to ask question, hamster answers smartly with knowledge in BN/HI/EN!"
+          >
+            <div
+              className={`p-2 rounded-xl transition-transform shrink-0 ${
+                (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
+                  ? 'bg-white text-purple-700 shadow-md scale-110'
+                  : 'bg-purple-600 text-white shadow-xs'
+              }`}
+            >
+              {isDirectListening && directVoiceMode === 'answer' ? (
+                <Mic className="animate-bounce" size={17} />
+              ) : isAnswerThinking ? (
+                <Sparkles className="animate-spin" size={17} />
+              ) : (
+                <Bot size={17} />
+              )}
+            </div>
+            <div className="flex flex-col text-left leading-tight min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-wide whitespace-nowrap">
+                  {isDirectListening && directVoiceMode === 'answer'
+                    ? 'Listening...'
+                    : isAnswerThinking
+                    ? 'Thinking...'
+                    : 'Button 2: ANSWER'}
+                </span>
+                <span className="text-[9px] bg-purple-100/90 text-purple-700 px-1 py-0.5 rounded font-mono font-bold">
+                  [{selectedLanguage}]
+                </span>
+              </div>
+              <span
+                className={`text-[10px] sm:text-[11px] font-bubble truncate ${
+                  (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
+                    ? 'text-purple-100 font-bold'
+                    : 'text-purple-600'
+                }`}
+              >
+                {isDirectListening && directVoiceMode === 'answer'
+                  ? 'Ask question ❓'
+                  : isAnswerThinking
+                  ? 'Gemini AI 🐹✨'
+                  : 'Smart Q&A (BN/HI/EN) 💡'}
               </span>
             </div>
-            <span className="text-[10px] font-bubble text-purple-600">AI Friend 🤖💬</span>
-          </div>
-        </button>
+          </button>
+          <button
+            onClick={handleChatClick}
+            title="Type question for smart answer"
+            className="ml-1 px-2 flex items-center justify-center rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300 shadow-xs cursor-pointer active:scale-95 transition-transform"
+          >
+            <Keyboard size={14} />
+          </button>
+        </div>
       </div>
 
-      {/* 2 TALENT ACTION BUTTONS: DANCE & SING */}
-      <div className="relative z-20 px-3 pt-0 pb-1 flex items-center justify-center gap-2">
-        {/* Dance Button */}
-        <button
-          id="btn-action-dance"
-          onClick={handleDanceClick}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer ${
-            isDancing
-              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400 ring-2 ring-pink-300 shadow-md animate-pulse'
-              : 'bg-white/90 backdrop-blur-md text-stone-800 border-pink-200/80 hover:bg-pink-50 hover:border-pink-300'
-          }`}
-          title="Make hamster dance with music and spins!"
-        >
-          <span className="text-xl">💃</span>
-          <div className="flex flex-col text-left leading-tight">
-            <span className="text-xs font-bold font-bubble">Dance</span>
-            <span className={`text-[10px] font-bubble ${isDancing ? 'text-pink-100 font-bold' : 'text-pink-600'}`}>
-              {isDancing ? 'Grooving! 🎶' : 'Music & Spins 🎶'}
-            </span>
-          </div>
-        </button>
-
-        {/* Sing Button */}
-        <button
-          id="btn-action-sing"
-          onClick={handleSingClick}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-2xl border font-bubble font-bold transition-all shadow-xs active:scale-95 cursor-pointer ${
-            isSinging
-              ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-purple-400 ring-2 ring-purple-300 shadow-md animate-pulse'
-              : 'bg-white/90 backdrop-blur-md text-stone-800 border-purple-200/80 hover:bg-purple-50 hover:border-purple-300'
-          }`}
-          title="Make hamster sing cute song with mouth animation & notes!"
-        >
-          <span className="text-xl">🎤</span>
-          <div className="flex flex-col text-left leading-tight">
-            <span className="text-xs font-bold font-bubble">Sing</span>
-            <span className={`text-[10px] font-bubble ${isSinging ? 'text-purple-100 font-bold' : 'text-purple-600'}`}>
-              {isSinging ? 'Singing! 🎵' : 'Cute Melody 🎵'}
-            </span>
-          </div>
-        </button>
-      </div>
-
-      {/* BOTTOM ACTION BUTTONS TOOLBAR */}
-      <footer className="relative z-20 p-3 pt-1">
-        <div className="grid grid-cols-6 gap-1.5 bg-white/95 backdrop-blur-md p-2 rounded-3xl border border-stone-200 shadow-lg">
+      {/* BOTTOM PET CARE & ACTIONS TOOLBAR (KEEP ALL FEATURES SAME) */}
+      <footer className="relative z-20 p-3 pt-0">
+        <div className="grid grid-cols-8 gap-1 bg-white/95 backdrop-blur-md p-1.5 rounded-3xl border border-stone-200 shadow-lg">
           {/* 1. Feed */}
           <button
             id="btn-action-feed"
@@ -931,70 +1421,102 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               soundManager.playPop();
               setIsQuickFoodOpen((prev) => !prev);
             }}
-            className={`flex flex-col items-center justify-center p-2 rounded-2xl active:scale-90 transition-all group ${
+            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
               isQuickFoodOpen ? 'bg-amber-100 ring-2 ring-amber-400' : 'hover:bg-amber-50'
             }`}
+            title="Feed Hamster"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">🥣</span>
-            <span className="text-[11px] font-bubble font-bold text-stone-700 mt-0.5">Feed</span>
+            <span className="text-xl group-hover:scale-110 transition-transform">🥣</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Feed</span>
           </button>
 
           {/* 2. Water */}
           <button
             id="btn-action-water"
             onClick={handleWaterClick}
-            className={`flex flex-col items-center justify-center p-2 rounded-2xl active:scale-90 transition-all group ${
+            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
               isDrinking ? 'bg-sky-100 ring-2 ring-sky-400' : 'hover:bg-sky-50'
             }`}
+            title="Give Fresh Water"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">💧</span>
-            <span className="text-[11px] font-bubble font-bold text-stone-700 mt-0.5">Water</span>
+            <span className="text-xl group-hover:scale-110 transition-transform">💧</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Water</span>
           </button>
 
           {/* 3. Play */}
           <button
             id="btn-action-play"
             onClick={onOpenPlay}
-            className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-transform group"
+            className="flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-transform cursor-pointer group"
+            title="Play Ball / Mini-Games"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">🎾</span>
-            <span className="text-[11px] font-bubble font-bold text-stone-700 mt-0.5">Play</span>
+            <span className="text-xl group-hover:scale-110 transition-transform">🎾</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Play</span>
           </button>
 
           {/* 4. Clean */}
           <button
             id="btn-action-clean"
             onClick={onOpenClean}
-            className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-teal-50 active:scale-90 transition-transform group"
+            className="flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl hover:bg-teal-50 active:scale-90 transition-transform cursor-pointer group"
+            title="Bath & Sponge Clean"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">🛁</span>
-            <span className="text-[11px] font-bubble font-bold text-stone-700 mt-0.5">Clean</span>
+            <span className="text-xl group-hover:scale-110 transition-transform">🛁</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Clean</span>
           </button>
 
           {/* 5. Sleep */}
           <button
             id="btn-action-sleep"
             onClick={onToggleSleep}
-            className={`flex flex-col items-center justify-center p-2 rounded-2xl active:scale-90 transition-all group ${
+            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
               pet.isSleeping ? 'bg-indigo-100 text-indigo-900 font-bold' : 'hover:bg-indigo-50'
             }`}
+            title="Sleep & Rest"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">
+            <span className="text-xl group-hover:scale-110 transition-transform">
               {pet.isSleeping ? '☀️' : '😴'}
             </span>
-            <span className="text-[11px] font-bubble font-bold text-stone-700 mt-0.5">
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">
               {pet.isSleeping ? 'Wake' : 'Sleep'}
             </span>
           </button>
 
-          {/* 6. Shop */}
+          {/* 6. Dance */}
+          <button
+            id="btn-action-dance"
+            onClick={handleDanceClick}
+            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
+              isDancing ? 'bg-pink-100 text-pink-900 font-bold animate-pulse' : 'hover:bg-pink-50'
+            }`}
+            title="Dance Routine"
+          >
+            <span className="text-xl group-hover:scale-110 transition-transform">💃</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Dance</span>
+          </button>
+
+          {/* 7. Sing */}
+          <button
+            id="btn-action-sing"
+            onClick={handleSingClick}
+            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
+              isSinging ? 'bg-purple-100 text-purple-900 font-bold animate-pulse' : 'hover:bg-purple-50'
+            }`}
+            title="Sing Cute Song"
+          >
+            <span className="text-xl group-hover:scale-110 transition-transform">🎤</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Sing</span>
+          </button>
+
+          {/* 8. Shop */}
           <button
             id="btn-action-shop"
             onClick={onOpenShop}
-            className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-orange-50 active:scale-90 transition-transform group"
+            className="flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl hover:bg-orange-50 active:scale-90 transition-transform cursor-pointer group"
+            title="Pet Boutique Shop"
           >
-            <span className="text-2xl group-hover:scale-110 transition-transform">🛍️</span>
-            <span className="text-[11px] font-bubble font-bold text-stone-700 mt-0.5">Shop</span>
+            <span className="text-xl group-hover:scale-110 transition-transform">🛍️</span>
+            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Shop</span>
           </button>
         </div>
       </footer>
