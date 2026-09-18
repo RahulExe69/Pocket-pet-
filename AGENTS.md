@@ -22,10 +22,11 @@
 - **Platform:** Google AI Studio Cloud Run sandboxed container.
 - **Port & Host Constraints:** External traffic is strictly routed to **Port 3000** through an nginx reverse proxy. The dev server **MUST** bind to `host: '0.0.0.0'` and `port: 3000`.
 - **HMR Behavior:** Hot Module Replacement is disabled via the platform environment variable `DISABLE_HMR=true`. File watching is set to `null` when `DISABLE_HMR=true` to save CPU cycles and avoid preview flickering.
-- **Production Deployment:** Single-Page Application (SPA). `npm run build` outputs static files into `dist/`, served by the platform's auto-injected static file server. (No custom `start` script is needed).
+- **Production Deployment:** Full-stack Express + Vite architecture. `npm run build` compiles static assets to `dist/` and bundles `server.ts` to `dist/server.cjs` via `esbuild`. Production runs via `node dist/server.cjs`.
 
 ### Technology Stack
 - **Framework:** React 19 (`react`, `react-dom`) with TypeScript (ESNext/ES2022, bundler module resolution).
+- **Server:** Express 4 with `tsx` development runner, lazy Gemini SDK (`@google/genai`), and Vite middleware.
 - **Bundler:** Vite 6 (`@vitejs/plugin-react`).
 - **Styling:** Tailwind CSS v4 integrated using `@tailwindcss/vite` and `@import "tailwindcss";` in `src/index.css`.
 - **3D Graphics:** Three.js (`three` v0.186.0) with custom procedural geometries and shaders (`src/components/3d/`).
@@ -42,8 +43,9 @@
   - `server.allowedHosts`: `true as const` (strictly typed for TS compatibility)
   - Path alias: `@/` maps to root `./`
 - **`package.json`:**
-  - `"dev"`: `"vite --host 0.0.0.0 --port 3000"`
-  - `"build"`: `"vite build"`
+  - `"dev"`: `"tsx server.ts"`
+  - `"build"`: `"vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs"`
+  - `"start"`: `"node dist/server.cjs"`
   - `"lint"`: `"tsc --noEmit"`
 
 ---
@@ -64,4 +66,5 @@
 | 2026-09-18 | Bug Fix | Voice System Restoration (Repeat & Answer TTS) | 1) Fixed SpeechSynthesis reliability in `speech.ts`: added global `activeUtterance` retention and keep-alive ticker to prevent Chrome/Safari garbage collector from cancelling audio mid-playback. 2) Added 35ms de-overlap queueing to prevent Chrome drop bugs when cancelling prior speech. 3) Strictly shielded the Continuous Repeat cycle in `HomeScreen.tsx` so mic error or onEnd events NEVER cancel or interrupt TTS during the speaking phase. 4) Verified the continuous cycle: Tap Repeat -> mic listens -> user speaks -> mic aborts -> hamster speaks exact words aloud in 1.8 pitch voice with 3D mouth animation -> automatically listens again without pressing Repeat. 5) Ensured Answer button uses identical TTS system to speak Gemini answers aloud with mouth chatter, with robust fallback speech. |
 | 2026-09-18 | Refinement | Hamster Voice Quality & Speaking Animation Polish | 1) Soft, warm, cute voice tuning: adjusted pitch to 1.28 and rate to 1.0 to eliminate robotic/metallic frequency-stretching artifacts while keeping a playful, sweet tone. 2) Added `selectBestWarmVoice` prioritizing natural/neural female voices (e.g. Samantha, Jenny, Google US/বাংলা/हिन्दी) across English, Bengali, and Hindi. 3) Added `prepareTextForNaturalSpeech`: strips markdown symbols (*, #, ~), emojis, and redundant quotes, normalizes spacing after punctuation marks (. ! ? ; : ।) for natural sentence cadence and pauses without mid-sentence word clipping. 4) Enhanced 3D speaking animation: multi-harmonic phoneme articulation (replaces exaggerated sine waves with soft, natural mouth movement), synchronized conversational eyelid blinking, subtle micro-nods and head tilts, and gentle ear twitches. 5) Kept hamster size, camera framing, Repeat continuous cycle, Answer/Gemini behavior, and pet-care features completely intact. |
 | 2026-09-18 | Bug Fix | Gemini Model 503 Capacity Spike & Cascade Resilience | 1) Fixed 503 high demand spikes by introducing a high-capacity model cascade: `gemini-flash-latest` -> `gemini-3.8-flash` -> `gemini-3.1-flash-lite`. 2) Added automatic jitter retry delay (350ms) for transient 503/429/UNAVAILABLE errors before switching models. 3) Replaced noisy stderr warning dumps with quiet error handling to prevent Cloud Run runtime error flags. 4) Added localized server fallback answer engine (`getSmartFallbackAnswer` for BN/HI/EN) so the user's pet always responds delightfully even during global model demand spikes. |
+| 2026-09-18 | Migration | GitHub Import Audit & AI Studio Compliance | Verified project normalization according to `github-import-migration`: 1) Confirmed npm package manager alignment with no conflicting lockfiles. 2) Created `.env.example` documenting `GEMINI_API_KEY`. 3) Verified `metadata.json`, `index.html`, and `server.ts` binding to `0.0.0.0:3000`. 4) Passed full `lint_applet` and `compile_applet` production build verification. |
 
