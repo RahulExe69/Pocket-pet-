@@ -52,7 +52,17 @@ export function sanitizePetState(raw: unknown): PetState {
 
   const data = raw as Partial<PetState>;
 
-  const validTypes: PetType[] = ['hamster', 'cat', 'dog', 'bunny', 'panda'];
+  const validTypes: PetType[] = [
+    'hamster',
+    'cat',
+    'chinchilla',
+    'ferret',
+    'hedgehog',
+    'gerbil',
+    'dog',
+    'bunny',
+    'panda',
+  ];
   const type: PetType = (data.type && validTypes.includes(data.type)) ? data.type : INITIAL_PET_STATE.type;
 
   const rawStats = (data.stats || {}) as Partial<PetStats>;

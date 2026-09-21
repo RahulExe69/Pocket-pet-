@@ -17,15 +17,15 @@ export interface PetPalette {
 // Color palettes for room wallpapers, flooring, beds, and pets
 export const COLOR_PALETTES: Record<string, PetPalette> = {
   hamster: {
-    body: 0xfff0c8, // Light cream #FFF0C8 (User requested)
-    belly: 0xffffff, // Pure soft white belly & chest
-    cheeks: 0xffffff, // Soft white chubby cheeks
-    snout: 0xffffff, // Soft white snout
-    nose: 0xff8da4, // Vivid baby-pink small button nose
-    earsInner: 0xffbccc, // Soft light pink inner ear
-    earsOuter: 0xfff0c8, // Light cream #FFF0C8 outer ear
-    eyes: 0x0a0808, // Shiny obsidian black
-    feet: 0xffdce3, // Dainty baby-pink / pale cream paws
+    body: 0xc4844d, // Mochi Golden-Honey Brown (#C4844D) from reference sheet
+    belly: 0xfffdf8, // Mochi Pure Cream White belly & chest (#FFFDF8)
+    cheeks: 0xfffdf8, // Mochi Chubby white cheeks (#FFFDF8)
+    snout: 0xfffdf8, // Mochi White muzzle (#FFFDF8)
+    nose: 0xfa9ca6, // Soft baby-pink button nose (#FA9CA6)
+    earsInner: 0xffa8b2, // Delicate warm pink inner ear (#FFA8B2)
+    earsOuter: 0xc4844d, // Golden-honey brown outer ear
+    eyes: 0x160c08, // Shiny obsidian with warm chocolate iris glow
+    feet: 0xfca7b0, // Baby-pink paws & toe beans (#FCA7B0)
     sprout: 0x74c043,
   },
   cat: {
@@ -69,6 +69,46 @@ export const COLOR_PALETTES: Record<string, PetPalette> = {
     eyes: 0x1e272e,
     feet: 0x2f3542,
   },
+  chinchilla: {
+    body: 0xa4b0be,
+    belly: 0xf1f2f6,
+    cheeks: 0xffb8b8,
+    snout: 0xf1f2f6,
+    earsInner: 0xffa8b2,
+    earsOuter: 0x747d8c,
+    eyes: 0x2f3542,
+    feet: 0xffa8b2,
+  },
+  ferret: {
+    body: 0x747d8c,
+    belly: 0xced6e0,
+    cheeks: 0xffa8b2,
+    snout: 0xced6e0,
+    earsInner: 0xffa8b2,
+    earsOuter: 0x57606f,
+    eyes: 0x1e272e,
+    feet: 0xffa8b2,
+  },
+  hedgehog: {
+    body: 0x8c7ae6,
+    belly: 0xf5f6fa,
+    cheeks: 0xffa8b2,
+    snout: 0xf5f6fa,
+    earsInner: 0xffa8b2,
+    earsOuter: 0x7158e2,
+    eyes: 0x1e272e,
+    feet: 0xffa8b2,
+  },
+  gerbil: {
+    body: 0xe1b12c,
+    belly: 0xf5cd79,
+    cheeks: 0xffb8b8,
+    snout: 0xf5cd79,
+    earsInner: 0xffa8b2,
+    earsOuter: 0xc4844d,
+    eyes: 0x1e272e,
+    feet: 0xffa8b2,
+  },
 };
 
 // Material cache to prevent GPU memory bloat on mobile devices
@@ -77,6 +117,302 @@ const materialCache = new Map<string, THREE.Material>();
 // Cached procedural fur textures (generated once on canvas, ultra lightweight & mobile-optimized)
 let cachedFurTexture: THREE.CanvasTexture | null = null;
 let cachedFurBumpMap: THREE.CanvasTexture | null = null;
+let cachedMochiGoldenFurTexture: THREE.CanvasTexture | null = null;
+let cachedMochiWhiteFurTexture: THREE.CanvasTexture | null = null;
+let cachedMochiEyeTexture: THREE.CanvasTexture | null = null;
+
+export function getMochiFurTextures(): { goldenMap: THREE.CanvasTexture; whiteMap: THREE.CanvasTexture; bumpMap: THREE.CanvasTexture } {
+  const size = 256;
+
+  // Bump map shared
+  if (!cachedFurBumpMap) {
+    const bumpCanvas = document.createElement('canvas');
+    bumpCanvas.width = size;
+    bumpCanvas.height = size;
+    const bCtx = bumpCanvas.getContext('2d')!;
+    bCtx.fillStyle = '#808080';
+    bCtx.fillRect(0, 0, size, size);
+
+    for (let k = 0; k < 2800; k++) {
+      const bx = Math.random() * size;
+      const by = Math.random() * size;
+      const blen = 3 + Math.random() * 7;
+      const bAngle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.45;
+      const isRaised = Math.random() > 0.45;
+
+      bCtx.strokeStyle = isRaised ? '#bcbcbc' : '#4d4d4d';
+      bCtx.lineWidth = 0.65 + Math.random() * 0.7;
+      bCtx.globalAlpha = 0.16 + Math.random() * 0.22;
+
+      bCtx.beginPath();
+      bCtx.moveTo(bx, by);
+      bCtx.lineTo(bx + Math.cos(bAngle) * blen, by + Math.sin(bAngle) * blen);
+      bCtx.stroke();
+    }
+    bCtx.globalAlpha = 1.0;
+    cachedFurBumpMap = new THREE.CanvasTexture(bumpCanvas);
+    cachedFurBumpMap.wrapS = THREE.RepeatWrapping;
+    cachedFurBumpMap.wrapT = THREE.RepeatWrapping;
+    cachedFurBumpMap.repeat.set(2.5, 2.5);
+  }
+
+  // 1. Mochi Warm Golden-Honey Fur Texture (Rich multi-tone strands matching reference sheet)
+  if (!cachedMochiGoldenFurTexture) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    // Warm golden-honey gradient base
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0, '#cb8b52');
+    grad.addColorStop(0.3, '#c4844d');
+    grad.addColorStop(0.7, '#b26e38');
+    grad.addColorStop(1, '#c17e47');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    // Directional hair strands in honey, amber, chestnut, and soft cream highlights
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3500; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const len = 4 + Math.random() * 9;
+      const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.4;
+      const shade = Math.random();
+
+      let stroke = '#d6975f'; // Soft golden amber
+      if (shade > 0.8) {
+        stroke = '#ffd7a6'; // Sunlit golden fluff tip
+      } else if (shade > 0.55) {
+        stroke = '#e5a56d'; // Light warm honey
+      } else if (shade > 0.25) {
+        stroke = '#a15b27'; // Rich warm chestnut undercoat
+      } else {
+        stroke = '#fce5c8'; // Subtle cream fluff sparkle
+      }
+
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 0.7 + Math.random() * 0.85;
+      ctx.globalAlpha = 0.22 + Math.random() * 0.32;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+
+    cachedMochiGoldenFurTexture = new THREE.CanvasTexture(canvas);
+    cachedMochiGoldenFurTexture.wrapS = THREE.RepeatWrapping;
+    cachedMochiGoldenFurTexture.wrapT = THREE.RepeatWrapping;
+    cachedMochiGoldenFurTexture.repeat.set(2.2, 2.2);
+  }
+
+  // 2. Mochi Pure Cream-White Fur Texture (Silky plush fluff for tummy, cheeks & blaze)
+  if (!cachedMochiWhiteFurTexture) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d')!;
+
+    const grad = ctx.createLinearGradient(0, 0, 0, size);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.5, '#fffdf8');
+    grad.addColorStop(1, '#fef9f0');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 2800; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const len = 4 + Math.random() * 8;
+      const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.45;
+      const shade = Math.random();
+
+      ctx.strokeStyle = shade > 0.4 ? '#ffffff' : '#f7ede1';
+      ctx.lineWidth = 0.65 + Math.random() * 0.75;
+      ctx.globalAlpha = 0.18 + Math.random() * 0.26;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1.0;
+
+    cachedMochiWhiteFurTexture = new THREE.CanvasTexture(canvas);
+    cachedMochiWhiteFurTexture.wrapS = THREE.RepeatWrapping;
+    cachedMochiWhiteFurTexture.wrapT = THREE.RepeatWrapping;
+    cachedMochiWhiteFurTexture.repeat.set(2.5, 2.5);
+  }
+
+  return {
+    goldenMap: cachedMochiGoldenFurTexture,
+    whiteMap: cachedMochiWhiteFurTexture,
+    bumpMap: cachedFurBumpMap,
+  };
+}
+
+// Mochi Anime / Pixar Sparkling Eye Texture (Matches Eye Detail in reference sheet)
+export function getMochiEyeTexture(): THREE.CanvasTexture {
+  if (cachedMochiEyeTexture) return cachedMochiEyeTexture;
+
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 8;
+
+  // Outer dark boundary
+  ctx.fillStyle = '#0a0503';
+  ctx.fillRect(0, 0, size, size);
+
+  // Deep obsidian pupil & warm chocolate iris gradient
+  const irisGrad = ctx.createRadialGradient(cx, cy + 20, 20, cx, cy, r);
+  irisGrad.addColorStop(0, '#0d0705');
+  irisGrad.addColorStop(0.65, '#1e0f09');
+  irisGrad.addColorStop(0.88, '#4a2514'); // Warm chocolate iris ring
+  irisGrad.addColorStop(1, '#0a0503');
+  ctx.fillStyle = irisGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Warm amber-hazel glowing crescent at lower edge
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 6, 0, Math.PI * 2);
+  ctx.clip();
+  const crescentGrad = ctx.createRadialGradient(cx, cy + 120, 30, cx, cy + 90, 180);
+  crescentGrad.addColorStop(0, 'rgba(168, 86, 38, 0.72)');
+  crescentGrad.addColorStop(0.5, 'rgba(122, 57, 24, 0.45)');
+  crescentGrad.addColorStop(1, 'rgba(10, 5, 3, 0)');
+  ctx.fillStyle = crescentGrad;
+  ctx.fillRect(0, cy - 20, size, size);
+  ctx.restore();
+
+  // Primary large bright white oval catchlight (at top right, ~1 o'clock)
+  ctx.save();
+  ctx.translate(cx + 60, cy - 70);
+  ctx.rotate(-Math.PI * 0.15);
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 68, 88, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Secondary crisp sparkling star / glint (at bottom left, ~7 o'clock)
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx - 85, cy + 70, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Tertiary tiny cute dot highlight (at middle right, ~3 o'clock)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.beginPath();
+  ctx.arc(cx + 105, cy + 30, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Delicate lower rim ambient light line
+  ctx.strokeStyle = 'rgba(255, 220, 195, 0.35)';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - 25, Math.PI * 0.25, Math.PI * 0.75);
+  ctx.stroke();
+
+  cachedMochiEyeTexture = new THREE.CanvasTexture(canvas);
+  return cachedMochiEyeTexture;
+}
+
+// Mochi Golden Fur Material
+export function getMochiGoldenFurMaterial(): THREE.MeshStandardMaterial {
+  const key = 'mochi_golden_fur';
+  if (materialCache.has(key)) return materialCache.get(key) as THREE.MeshStandardMaterial;
+
+  const { goldenMap, bumpMap } = getMochiFurTextures();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: goldenMap,
+    bumpMap: bumpMap,
+    bumpScale: 0.012,
+    roughness: 0.78,
+    metalness: 0.02,
+    flatShading: false,
+  });
+  materialCache.set(key, mat);
+  return mat;
+}
+
+// Mochi White Fur Material
+export function getMochiWhiteFurMaterial(): THREE.MeshStandardMaterial {
+  const key = 'mochi_white_fur';
+  if (materialCache.has(key)) return materialCache.get(key) as THREE.MeshStandardMaterial;
+
+  const { whiteMap, bumpMap } = getMochiFurTextures();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xfffdf8,
+    map: whiteMap,
+    bumpMap: bumpMap,
+    bumpScale: 0.009,
+    roughness: 0.76,
+    metalness: 0.0,
+    flatShading: false,
+  });
+  materialCache.set(key, mat);
+  return mat;
+}
+
+// Mochi Eye Material with Pixar catchlights
+export function getMochiEyeMaterial(): THREE.MeshStandardMaterial {
+  const key = 'mochi_eye_mat';
+  if (materialCache.has(key)) return materialCache.get(key) as THREE.MeshStandardMaterial;
+
+  const eyeTex = getMochiEyeTexture();
+  const mat = new THREE.MeshStandardMaterial({
+    map: eyeTex,
+    roughness: 0.04,
+    metalness: 0.12,
+    flatShading: false,
+  });
+  materialCache.set(key, mat);
+  return mat;
+}
+
+// Mochi Baby-Pink Paw & Toe Bean Material
+export function getMochiPawMaterial(): THREE.MeshStandardMaterial {
+  const key = 'mochi_paw_mat';
+  if (materialCache.has(key)) return materialCache.get(key) as THREE.MeshStandardMaterial;
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xfca7b0, // Soft baby-pink from Paw Detail in reference
+    roughness: 0.38,
+    metalness: 0.02,
+    flatShading: false,
+  });
+  materialCache.set(key, mat);
+  return mat;
+}
+
+// Mochi Button Nose Material
+export function getMochiNoseMaterial(): THREE.MeshStandardMaterial {
+  const key = 'mochi_nose_mat';
+  if (materialCache.has(key)) return materialCache.get(key) as THREE.MeshStandardMaterial;
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xfa9ca6, // Soft baby-pink button nose
+    roughness: 0.28,
+    metalness: 0.04,
+    flatShading: false,
+  });
+  materialCache.set(key, mat);
+  return mat;
+}
 
 export function getFurTextures(): { map: THREE.CanvasTexture; bumpMap: THREE.CanvasTexture } {
   if (cachedFurTexture && cachedFurBumpMap) {

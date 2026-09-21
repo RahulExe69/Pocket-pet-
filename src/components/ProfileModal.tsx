@@ -80,7 +80,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     },
   ];
 
-  const petTypes: PetType[] = ['hamster', 'cat', 'dog', 'bunny', 'panda'];
+  const petTypes: PetType[] = [
+    'hamster',
+    'cat',
+    'chinchilla',
+    'ferret',
+    'hedgehog',
+    'gerbil',
+    'dog',
+    'bunny',
+    'panda',
+  ];
 
   return (
     <AnimatePresence>

@@ -1,4 +1,13 @@
-export type PetType = 'hamster' | 'cat' | 'dog' | 'bunny' | 'panda';
+export type PetType =
+  | 'hamster'
+  | 'cat'
+  | 'chinchilla'
+  | 'ferret'
+  | 'hedgehog'
+  | 'gerbil'
+  | 'dog'
+  | 'bunny'
+  | 'panda';
 
 export type PetMood = 'happy' | 'hungry' | 'sleepy' | 'dirty' | 'excited' | 'sad';
 

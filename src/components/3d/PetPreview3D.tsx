@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { PetType } from '../../types';
-import { buildPetModel } from './petGeometries';
+import { buildPetModel, PetNodes } from './petGeometries';
+import { loadGLTFPet, buildGLTFPetNodes } from './petModelLoader';
 
 interface PetPreview3DProps {
   type: PetType;
@@ -56,30 +57,46 @@ export const PetPreview3D: React.FC<PetPreview3DProps> = ({ type }) => {
     pedestal.receiveShadow = true;
     scene.add(pedestal);
 
-    // Build pet model
-    const petNodes = buildPetModel(type, {
+    // Initial procedural pet model for instant visual feedback
+    let activePetNodes: PetNodes = buildPetModel(type, {
       accessory: type === 'hamster' ? 'hat-sprout' : undefined,
     });
-    scene.add(petNodes.root);
+    scene.add(activePetNodes.root);
+
+    let isDisposed = false;
+
+    // Load authentic 3D GLTF textured model
+    loadGLTFPet(type).then((gltf) => {
+      if (gltf && !isDisposed) {
+        const gltfPetNodes = buildGLTFPetNodes(gltf, type, {
+          accessory: type === 'hamster' ? 'hat-sprout' : undefined,
+        });
+        gltfPetNodes.root.rotation.y = activePetNodes.root.rotation.y;
+        scene.remove(activePetNodes.root);
+        activePetNodes = gltfPetNodes;
+        scene.add(activePetNodes.root);
+      }
+    });
 
     let animId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
       const elapsed = clock.getElapsedTime();
 
       // Gentle rotation on pedestal
-      petNodes.root.rotation.y = elapsed * 0.8;
+      if (activePetNodes) {
+        activePetNodes.root.rotation.y = elapsed * 0.8;
 
-      // Breathing bob
-      const breathe = Math.sin(elapsed * 3.5) * 0.02;
-      petNodes.bodyGroup.position.y = 0.55 + breathe;
+        // Breathing bob
+        const breathe = Math.sin(elapsed * 3.5) * 0.02;
+        activePetNodes.bodyGroup.position.y = 0.55 + breathe;
 
-      // Sprout or ear gentle bob
-      petNodes.leftEar.rotation.z = Math.sin(elapsed * 2) * 0.05;
-      petNodes.rightEar.rotation.z = -Math.sin(elapsed * 2) * 0.05;
+        // Sprout or ear gentle bob
+        activePetNodes.leftEar.rotation.z = Math.sin(elapsed * 2) * 0.05;
+        activePetNodes.rightEar.rotation.z = -Math.sin(elapsed * 2) * 0.05;
+      }
 
       renderer.render(scene, camera);
     };
@@ -87,6 +104,7 @@ export const PetPreview3D: React.FC<PetPreview3DProps> = ({ type }) => {
     animate();
 
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(animId);
       renderer.dispose();
     };

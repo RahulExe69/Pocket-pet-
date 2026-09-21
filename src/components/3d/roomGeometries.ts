@@ -107,7 +107,7 @@ export function buildRoomEnvironment(
   leftBase.position.set(-3.2, 0.09, 0);
   group.add(leftBase);
 
-  // 3. Walls (Back wall & Left wall: Soft pastel pink #FFD6E0 bright cute toy house diorama)
+  // 3. Walls (4 Inward-facing walls with FrontSide culling for seamless 360° rotation)
   let wallColor = 0xffd6e0; // Soft pastel pink #FFD6E0 (User requested)
   if (room.wallpaper === 'wall-pink-polka') {
     wallColor = 0xffd6e0;
@@ -120,36 +120,62 @@ export function buildRoomEnvironment(
   }
 
   const wallMat = getToonMaterial(wallColor, 0.4);
+  wallMat.side = THREE.FrontSide; // Back-face culling: walls facing away from camera become automatically invisible!
 
-  const backWallGeo = new THREE.BoxGeometry(6.5, 4.2, 0.2);
+  // Back Wall (facing +Z into room)
+  const backWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
   const backWallMesh = new THREE.Mesh(backWallGeo, wallMat);
-  backWallMesh.position.set(0, 2.0, -3.3);
+  backWallMesh.position.set(0, 2.0, -3.25);
   backWallMesh.receiveShadow = true;
   group.add(backWallMesh);
 
-  const leftWallGeo = new THREE.BoxGeometry(0.2, 4.2, 6.5);
+  // Left Wall (facing +X into room)
+  const leftWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
   const leftWallMesh = new THREE.Mesh(leftWallGeo, wallMat);
-  leftWallMesh.position.set(-3.3, 2.0, 0);
+  leftWallMesh.position.set(-3.25, 2.0, 0);
+  leftWallMesh.rotation.y = Math.PI / 2;
   leftWallMesh.receiveShadow = true;
   group.add(leftWallMesh);
 
-  // Cute toy-house chair rail & wainscoting molding trim
+  // Right Wall (facing -X into room)
+  const rightWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
+  const rightWallMesh = new THREE.Mesh(rightWallGeo, wallMat);
+  rightWallMesh.position.set(3.25, 2.0, 0);
+  rightWallMesh.rotation.y = -Math.PI / 2;
+  rightWallMesh.receiveShadow = true;
+  group.add(rightWallMesh);
+
+  // Front Wall (facing -Z into room)
+  const frontWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
+  const frontWallMesh = new THREE.Mesh(frontWallGeo, wallMat);
+  frontWallMesh.position.set(0, 2.0, 3.25);
+  frontWallMesh.rotation.y = Math.PI;
+  frontWallMesh.receiveShadow = true;
+  group.add(frontWallMesh);
+
+  // Cute toy-house chair rail & wainscoting molding trim along walls
   const chairRailMat = getToonMaterial(0xffffff, 0.25);
-  const backRailGeo = new THREE.BoxGeometry(6.5, 0.08, 0.08);
-  const backRail = new THREE.Mesh(backRailGeo, chairRailMat);
-  backRail.position.set(0, 1.35, -3.22);
+  chairRailMat.side = THREE.FrontSide;
+  const railGeo = new THREE.PlaneGeometry(6.5, 0.08);
+
+  const backRail = new THREE.Mesh(railGeo, chairRailMat);
+  backRail.position.set(0, 1.35, -3.24);
   group.add(backRail);
 
-  const leftRailGeo = new THREE.BoxGeometry(0.08, 0.08, 6.5);
-  const leftRail = new THREE.Mesh(leftRailGeo, chairRailMat);
-  leftRail.position.set(-3.22, 1.35, 0);
+  const leftRail = new THREE.Mesh(railGeo, chairRailMat);
+  leftRail.position.set(-3.24, 1.35, 0);
+  leftRail.rotation.y = Math.PI / 2;
   group.add(leftRail);
 
-  // Toy-house crown molding along top
-  const crownGeo = new THREE.BoxGeometry(6.5, 0.12, 0.1);
-  const backCrown = new THREE.Mesh(crownGeo, chairRailMat);
-  backCrown.position.set(0, 4.04, -3.22);
-  group.add(backCrown);
+  const rightRail = new THREE.Mesh(railGeo, chairRailMat);
+  rightRail.position.set(3.24, 1.35, 0);
+  rightRail.rotation.y = -Math.PI / 2;
+  group.add(rightRail);
+
+  const frontRail = new THREE.Mesh(railGeo, chairRailMat);
+  frontRail.position.set(0, 1.35, 3.24);
+  frontRail.rotation.y = Math.PI;
+  group.add(frontRail);
 
   // 4. Window with Scenic Sky
   const windowGroup = new THREE.Group();

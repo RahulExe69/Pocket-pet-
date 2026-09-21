@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Volume2, VolumeX, Bell, BellOff, RotateCcw, Heart, Info } from 'lucide-react';
+import { X, Volume2, VolumeX, Bell, BellOff, RotateCcw, Heart, Info, Sparkles } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface SettingsModalProps {
@@ -11,6 +11,8 @@ interface SettingsModalProps {
   notificationsEnabled: boolean;
   onToggleNotifications: (enabled: boolean) => void;
   onResetPet: () => void;
+  modelStyle?: 'textured' | 'mochi';
+  onToggleModelStyle?: (style: 'textured' | 'mochi') => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -21,6 +23,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   notificationsEnabled,
   onToggleNotifications,
   onResetPet,
+  modelStyle = 'textured',
+  onToggleModelStyle,
 }) => {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -114,6 +118,56 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }`}
                   />
                 </button>
+              </div>
+
+              {/* 3D Graphics & Pet Style Selector */}
+              <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-purple-100 text-purple-800 text-lg">
+                      <Sparkles size={20} />
+                    </div>
+                    <div>
+                      <div className="font-bubble text-sm font-bold text-stone-800">3D Pet Model</div>
+                      <div className="text-xs text-stone-500">Switch between Real 3D textured model or Stylized Mochi</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    id="btn-style-textured"
+                    type="button"
+                    onClick={() => {
+                      soundManager.playPop();
+                      if (onToggleModelStyle) onToggleModelStyle('textured');
+                    }}
+                    className={`py-2 px-3 rounded-xl font-bubble text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      modelStyle === 'textured'
+                        ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
+                        : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    <span>✨ Real 3D GLB</span>
+                    {modelStyle === 'textured' && <span className="text-[10px]">✓</span>}
+                  </button>
+                  <button
+                    id="btn-style-mochi"
+                    type="button"
+                    onClick={() => {
+                      soundManager.playPop();
+                      if (onToggleModelStyle) onToggleModelStyle('mochi');
+                    }}
+                    className={`py-2 px-3 rounded-xl font-bubble text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      modelStyle === 'mochi'
+                        ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
+                        : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    <span>🍡 Stylized Mochi</span>
+                    {modelStyle === 'mochi' && <span className="text-[10px]">✓</span>}
+                  </button>
+                </div>
               </div>
 
               {/* App Info with Official App Icon */}

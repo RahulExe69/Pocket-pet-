@@ -1,12 +1,12 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { PetState, PetMood, MultiplayerPlayer, MultiplayerMiniGameType } from '../../types';
 import { buildPetModel, PetNodes, buildCustomizationItems } from './petGeometries';
+import { loadGLTFPet, buildGLTFPetNodes } from './petModelLoader';
 import { buildRoomEnvironment, RoomNodes, populateFoodBowl } from './roomGeometries';
 import { PetParticleSystem } from './petParticleSystem';
 import { createPetNameTagSprite, createHamsterPlayBall } from './threeHelpers';
 import { soundManager } from '../../utils/audio';
-import { RotateCw, ZoomIn, Eye, Sparkles } from 'lucide-react';
 
 export type AnimationState =
   | 'idle'
@@ -50,6 +50,7 @@ interface PetScene3DProps {
   onTapFloorMove?: (pos: { x: number; z: number }) => void;
   activeGame?: MultiplayerMiniGameType | null;
   isTalking?: boolean;
+  modelStyle?: 'textured' | 'mochi';
 }
 
 export const PetScene3D: React.FC<PetScene3DProps> = ({
@@ -74,6 +75,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   onTapFloorMove,
   activeGame = null,
   isTalking = false,
+  modelStyle = 'textured',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -98,7 +100,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   const animTimeRef = useRef<number>(0);
   const targetPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0.2));
   const currentPosRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 0.2));
-  const currentRotYRef = useRef<number>(0);
+  const currentRotYRef = useRef<number>(Math.PI / 4);
   const isWalkingRef = useRef<boolean>(false);
   const lastStateChangeRef = useRef<number>(Date.now());
   const blinkTimerRef = useRef<number>(2.0);
@@ -114,24 +116,21 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   const floorMarkerRef = useRef<{ ring: THREE.Mesh; dot: THREE.Mesh; life: number } | null>(null);
   const lastNoteSpawnTimeRef = useRef<number>(0);
 
-  // Camera Orbit State - balanced framing showing hamster centered in foreground with surrounding 3D room
+  // Camera Orbit State - Talking Tom 2 corner front view with 360° horizontal rotation (up/down locked)
   const cameraAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
-    theta: 0,
-    phi: 0.46,
-    radius: 5.4,
+    theta: Math.PI / 4,
+    phi: 1.32,
+    radius: 5.2,
   });
   const targetAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
-    theta: 0,
-    phi: 0.46,
-    radius: 5.4,
+    theta: Math.PI / 4,
+    phi: 1.32,
+    radius: 5.2,
   });
   const isDraggingRef = useRef<boolean>(false);
   const lastPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const startPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const hasMovedPointerRef = useRef<boolean>(false);
-
-  // UI Helper states
-  const [cameraMode, setCameraMode] = useState<'front' | 'angled' | 'top'>('front');
 
   // Trigger happy jump animation
   const triggerHappyAnimation = useCallback(() => {
@@ -252,19 +251,6 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     }
   }, [isTalking]);
 
-  // Camera presets
-  const handleCameraPreset = (mode: 'front' | 'angled' | 'top') => {
-    setCameraMode(mode);
-    soundManager.playPop();
-    if (mode === 'front') {
-      targetAngleRef.current = { theta: 0, phi: 0.46, radius: 5.4 };
-    } else if (mode === 'angled') {
-      targetAngleRef.current = { theta: 0.42, phi: 0.52, radius: 5.8 };
-    } else if (mode === 'top') {
-      targetAngleRef.current = { theta: -0.25, phi: 0.80, radius: 6.2 };
-    }
-  };
-
   // Sync pet sleep state with 3D scene
   useEffect(() => {
     if (pet.isSleeping) {
@@ -351,6 +337,31 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
 
         scene.add(fNodes.root);
 
+        // Also load friend pet GLTF model if textured style is active
+        if (modelStyle !== 'mochi') {
+          loadGLTFPet(friendPet.petType || 'hamster').then((fGltf) => {
+            if (fGltf && sceneRef.current && friendNodesRef.current) {
+              const gltfFriendNodes = buildGLTFPetNodes(
+                fGltf,
+                friendPet.petType || 'hamster',
+                friendPet.customization || { accessory: 'bow-pink' }
+              );
+              gltfFriendNodes.root.scale.set(0.95, 0.95, 0.95);
+              gltfFriendNodes.root.position.copy(friendCurrentPosRef.current);
+              gltfFriendNodes.root.rotation.y = friendHeadingRef.current;
+              gltfFriendNodes.root.userData.petId = friendPet.petId;
+
+              if (friendNameTagRef.current) {
+                friendNodesRef.current.root.remove(friendNameTagRef.current);
+                gltfFriendNodes.root.add(friendNameTagRef.current);
+              }
+              sceneRef.current.remove(friendNodesRef.current.root);
+              sceneRef.current.add(gltfFriendNodes.root);
+              friendNodesRef.current = gltfFriendNodes;
+            }
+          });
+        }
+
         // Add host's name tag if not present
         if (petNodesRef.current && !playerNameTagRef.current) {
           const playerTag = createPetNameTagSprite(pet.name, pet.id, false);
@@ -413,9 +424,17 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     scene.background = pet.isSleeping ? new THREE.Color(0x2d1a33) : new THREE.Color(0xffe9f0);
     sceneRef.current = scene;
 
-    // 2. Camera - balanced perspective showing hamster and room environment
-    const camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 30);
-    camera.position.set(0, 2.8, 5.4);
+    // 2. Camera - eye-level Talking Tom corner front view
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 30);
+    const initTheta = Math.PI / 4;
+    const initPhi = 1.32;
+    const initRadius = 5.2;
+    camera.position.set(
+      initRadius * Math.sin(initTheta) * Math.sin(initPhi),
+      initRadius * Math.cos(initPhi) + 0.35,
+      initRadius * Math.cos(initTheta) * Math.sin(initPhi)
+    );
+    camera.lookAt(0, 0.65, 0.1);
     cameraRef.current = camera;
 
     // 3. Renderer
@@ -438,7 +457,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     scene.add(roomNodes.group);
 
     // 5. Build 3D Pet - cute, naturally proportioned, fully visible from head to body
-    const petNodes = buildPetModel(pet.type, pet.customization);
+    let petNodes = buildPetModel(pet.type, pet.customization);
     petNodes.root.scale.set(0.95, 0.95, 0.95);
     petNodesRef.current = petNodes;
     scene.add(petNodes.root);
@@ -449,6 +468,29 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       targetPosRef.current.copy(currentPosRef.current);
       petNodes.root.position.copy(currentPosRef.current);
       animStateRef.current = 'sleeping';
+    }
+
+    // Load authentic 3D GLTF textured model from pets.glb when textured style is active
+    if (modelStyle !== 'mochi') {
+      loadGLTFPet(pet.type).then((gltf) => {
+        if (gltf && sceneRef.current) {
+          const gltfPetNodes = buildGLTFPetNodes(gltf, pet.type, pet.customization);
+          gltfPetNodes.root.scale.set(0.95, 0.95, 0.95);
+          gltfPetNodes.root.position.copy(currentPosRef.current);
+          gltfPetNodes.root.rotation.y = currentRotYRef.current;
+
+          // Preserve player name tag if attached
+          if (playerNameTagRef.current && petNodesRef.current) {
+            petNodesRef.current.root.remove(playerNameTagRef.current);
+            gltfPetNodes.root.add(playerNameTagRef.current);
+          }
+
+          scene.remove(petNodes.root);
+          scene.add(gltfPetNodes.root);
+          petNodes = gltfPetNodes;
+          petNodesRef.current = gltfPetNodes;
+        }
+      });
     }
 
     // 6. Particle System
@@ -512,15 +554,11 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         hasMovedPointerRef.current = true;
       }
 
-      // Rotate camera around room
-      targetAngleRef.current.theta -= dx * 0.007;
-      targetAngleRef.current.phi = Math.max(
-        0.2,
-        Math.min(0.95, targetAngleRef.current.phi + dy * 0.005)
-      );
+      // 360° Horizontal Rotation around Pet - unconstrained, smooth!
+      targetAngleRef.current.theta -= dx * 0.0075;
 
-      // Clamp theta so player stays within pleasant room viewing cone (-0.85 to +0.85 rad)
-      targetAngleRef.current.theta = Math.max(-0.85, Math.min(0.85, targetAngleRef.current.theta));
+      // Up and down is strictly LOCKED to maintain Talking Tom eye-level corner view!
+      targetAngleRef.current.phi = 1.32;
 
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
     };
@@ -537,7 +575,8 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         raycaster.setFromCamera(mouse, camera);
 
         // Check if pet clicked
-        const petIntersects = raycaster.intersectObjects(petNodes.bodyGroup.children, true);
+        const activePetRoot = petNodesRef.current ? petNodesRef.current.root : petNodes.root;
+        const petIntersects = raycaster.intersectObjects(activePetRoot.children, true);
         if (petIntersects.length > 0) {
           if (!pet.isSleeping) {
             triggerHappyAnimation();
@@ -661,6 +700,9 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       animTimeRef.current += delta;
       const t = animTimeRef.current;
 
+      const petNodes = petNodesRef.current;
+      if (!petNodes) return;
+
       // Smooth camera orbit damping
       const curCam = cameraAngleRef.current;
       const tarCam = targetAngleRef.current;
@@ -671,7 +713,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       const camX = curCam.radius * Math.sin(curCam.theta) * Math.sin(curCam.phi);
       const camY = curCam.radius * Math.cos(curCam.phi);
       const camZ = curCam.radius * Math.cos(curCam.theta) * Math.sin(curCam.phi);
-      camera.position.set(camX, camY + 0.4, camZ);
+      camera.position.set(camX, camY + 0.35, camZ);
       camera.lookAt(0, 0.65, 0.1);
 
       // Hamster always standing front center: gently return to front if displaced
@@ -684,6 +726,14 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         targetPosRef.current.set(0, 0, 0.2);
         animStateRef.current = 'walking';
         isWalkingRef.current = true;
+      }
+
+      // In idle, turn to face directly into the corner front camera (eye contact with player)
+      if (animStateRef.current === 'idle' && !isWalkingRef.current && !isTalkingRef.current) {
+        let diff = (Math.PI / 4) - currentRotYRef.current;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        currentRotYRef.current += diff * 0.08;
       }
 
       // Blink animation (only when awake)
@@ -1209,7 +1259,7 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
       renderer.dispose();
       particles.clear();
     };
-  }, [pet.type]);
+  }, [pet.type, modelStyle]);
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center overflow-hidden select-none">
@@ -1219,52 +1269,6 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         ref={containerRef}
         className="w-full h-full cursor-grab active:cursor-grabbing touch-none"
       />
-
-      {/* 3D Scene Controls Overlay (Floating Top-Right) */}
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 bg-white/90 backdrop-blur-md p-0.5 rounded-xl border border-pink-200/90 shadow-xs">
-        <button
-          id="btn-camera-preset-front"
-          onClick={() => handleCameraPreset('front')}
-          title="Front View"
-          className={`p-1 rounded-lg transition-all ${
-            cameraMode === 'front'
-              ? 'bg-pink-500 text-white shadow-xs font-bold'
-              : 'text-stone-600 hover:bg-pink-100/60'
-          }`}
-        >
-          <Eye size={13} />
-        </button>
-        <button
-          id="btn-camera-preset-angled"
-          onClick={() => handleCameraPreset('angled')}
-          title="Angled Room View"
-          className={`p-1 rounded-lg transition-all ${
-            cameraMode === 'angled'
-              ? 'bg-pink-500 text-white shadow-xs font-bold'
-              : 'text-stone-600 hover:bg-pink-100/60'
-          }`}
-        >
-          <RotateCw size={13} />
-        </button>
-        <button
-          id="btn-camera-preset-top"
-          onClick={() => handleCameraPreset('top')}
-          title="Top Isometric View"
-          className={`p-1 rounded-lg transition-all ${
-            cameraMode === 'top'
-              ? 'bg-pink-500 text-white shadow-xs font-bold'
-              : 'text-stone-600 hover:bg-pink-100/60'
-          }`}
-        >
-          <ZoomIn size={13} />
-        </button>
-      </div>
-
-      {/* Swipe to Rotate & Tap to Move Guide Hint */}
-      <div className="absolute bottom-1 pointer-events-none z-10 flex items-center gap-1 text-[10px] font-bold text-stone-600/90 bg-white/80 backdrop-blur-xs px-2.5 py-0.5 rounded-full border border-pink-200/60 shadow-xs">
-        <Sparkles size={9} className="text-pink-500" />
-        <span>Tap floor to walk • Drag to rotate</span>
-      </div>
     </div>
   );
 };

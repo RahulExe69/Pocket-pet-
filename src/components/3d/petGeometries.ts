@@ -9,6 +9,11 @@ import {
   getShinyEyeMaterial,
   getPinkNoseMaterial,
   getSmallPawMaterial,
+  getMochiGoldenFurMaterial,
+  getMochiWhiteFurMaterial,
+  getMochiEyeMaterial,
+  getMochiPawMaterial,
+  getMochiNoseMaterial,
 } from './threeHelpers';
 
 export interface PetNodes {
@@ -43,12 +48,30 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   bodyGroup.position.y = 0.55;
   root.add(bodyGroup);
 
-  // 1. Realistic fluffy light brown fur body (cuddly round potato / egg shape)
-  const bodyGeo = new THREE.SphereGeometry(0.56, 28, 24);
-  bodyGeo.scale(1.02, 1.06, 0.96);
+  // Materials customized for Mochi and other pets
   const bodyMat = isHamster
-    ? getFluffyFurMaterial(palette.body, 0.84)
-    : getToonMaterial(palette.body, 0.45);
+    ? getMochiGoldenFurMaterial()
+    : getFluffyFurMaterial(palette.body, 0.84);
+
+  const bellyMat = isHamster
+    ? getMochiWhiteFurMaterial()
+    : getWhiteBellyFurMaterial(0xffffff, 0.82);
+
+  const pawMat = isHamster
+    ? getMochiPawMaterial()
+    : getSmallPawMaterial();
+
+  const noseMat = isHamster
+    ? getMochiNoseMaterial()
+    : getPinkNoseMaterial();
+
+  const eyeMat = isHamster
+    ? getMochiEyeMaterial()
+    : getShinyEyeMaterial();
+
+  // 1. Realistic fluffy body (cuddly round pear / dumpling shape)
+  const bodyGeo = new THREE.SphereGeometry(isHamster ? 0.58 : 0.56, 32, 28);
+  bodyGeo.scale(isHamster ? 1.05 : 1.02, isHamster ? 1.08 : 1.06, 0.98);
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
   bodyMesh.castShadow = true;
   bodyMesh.receiveShadow = true;
@@ -56,59 +79,77 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
 
   // Fluffy hip contours (adds that adorable chubby rodent silhouette)
   if (isHamster) {
-    const hipFluffGeo = new THREE.SphereGeometry(0.24, 16, 14);
-    hipFluffGeo.scale(0.9, 1.2, 0.8);
+    const hipFluffGeo = new THREE.SphereGeometry(0.28, 20, 16);
+    hipFluffGeo.scale(0.95, 1.25, 0.85);
     const leftHip = new THREE.Mesh(hipFluffGeo, bodyMat);
-    leftHip.position.set(-0.36, -0.16, -0.05);
-    leftHip.rotation.z = 0.25;
+    leftHip.position.set(-0.35, -0.15, -0.04);
+    leftHip.rotation.z = 0.22;
     bodyGroup.add(leftHip);
 
     const rightHip = new THREE.Mesh(hipFluffGeo, bodyMat);
-    rightHip.position.set(0.36, -0.16, -0.05);
-    rightHip.rotation.z = -0.25;
+    rightHip.position.set(0.35, -0.15, -0.04);
+    rightHip.rotation.z = -0.22;
     bodyGroup.add(rightHip);
+
+    // Mochi White Nape Spot / Diamond on upper back (from reference sheet Top view)
+    const napeGeo = new THREE.SphereGeometry(0.19, 18, 14);
+    napeGeo.scale(0.95, 0.65, 0.32);
+    const napeMesh = new THREE.Mesh(napeGeo, bellyMat);
+    napeMesh.position.set(0, 0.38, -0.34);
+    napeMesh.rotation.x = -0.38;
+    bodyGroup.add(napeMesh);
   }
 
-  // 2. Soft pure white belly & chest patch
-  const bellyGeo = new THREE.SphereGeometry(0.44, 22, 18);
-  bellyGeo.scale(0.88, 1.0, 0.5);
-  const bellyMat = isHamster
-    ? getWhiteBellyFurMaterial(0xffffff, 0.82)
-    : getToonMaterial(palette.belly, 0.5);
+  // 2. Soft pure white belly & chest patch (Lush curved belly wrapping around front)
+  const bellyGeo = new THREE.SphereGeometry(isHamster ? 0.48 : 0.44, 26, 22);
+  bellyGeo.scale(isHamster ? 0.92 : 0.88, isHamster ? 1.04 : 1.0, isHamster ? 0.56 : 0.5);
   const bellyMesh = new THREE.Mesh(bellyGeo, bellyMat);
-  bellyMesh.position.set(0, -0.04, 0.35);
+  bellyMesh.position.set(0, -0.05, isHamster ? 0.33 : 0.35);
   bodyGroup.add(bellyMesh);
 
   // 3. Head group (anchored for bobs, tilts, chewing and drinking)
   const headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.2, 0.05);
+  headGroup.position.set(0, 0.18, 0.06);
   bodyGroup.add(headGroup);
 
+  // Head base sphere to blend seamlessly with chubby body
+  if (isHamster) {
+    const headBaseGeo = new THREE.SphereGeometry(0.48, 28, 24);
+    headBaseGeo.scale(1.05, 0.94, 0.96);
+    const headBase = new THREE.Mesh(headBaseGeo, bodyMat);
+    headGroup.add(headBase);
+
+    // Mochi White Forehead Blaze Stripe (from between ears down to snout)
+    const blazeGeo = new THREE.SphereGeometry(0.24, 20, 16);
+    blazeGeo.scale(0.52, 1.25, 0.42);
+    const blazeMesh = new THREE.Mesh(blazeGeo, bellyMat);
+    blazeMesh.position.set(0, 0.17, 0.38);
+    blazeMesh.rotation.x = -0.26;
+    headGroup.add(blazeMesh);
+  }
+
   // Snout (sweet rounded soft white muzzle)
-  const snoutGeo = new THREE.SphereGeometry(0.22, 20, 16);
-  snoutGeo.scale(1.12, 0.74, 0.84);
+  const snoutGeo = new THREE.SphereGeometry(isHamster ? 0.23 : 0.22, 22, 18);
+  snoutGeo.scale(1.15, 0.78, 0.88);
   const snoutMat = isHamster
-    ? getWhiteBellyFurMaterial(0xffffff, 0.78)
+    ? bellyMat
     : getToonMaterial(palette.snout || palette.belly, 0.4);
   const snout = new THREE.Mesh(snoutGeo, snoutMat);
-  snout.position.set(0, 0.025, 0.46);
+  snout.position.set(0, 0.02, 0.46);
   headGroup.add(snout);
 
   // 4. Baby-pink small button nose (distinct, delicate and clearly visible on front of snout)
-  const noseGeo = new THREE.SphereGeometry(0.046, 16, 14);
-  noseGeo.scale(1.22, 0.88, 0.82);
-  const noseMat = isHamster
-    ? getPinkNoseMaterial()
-    : getToonMaterial(palette.nose || 0xff8da4, 0.25);
+  const noseGeo = new THREE.SphereGeometry(isHamster ? 0.052 : 0.046, 18, 16);
+  noseGeo.scale(1.24, 0.88, 0.82);
   const nose = new THREE.Mesh(noseGeo, noseMat);
-  nose.position.set(0, 0.088, 0.652);
+  nose.position.set(0, 0.084, 0.655);
   headGroup.add(nose);
 
   // Philtrum cleft line beneath the pink nose
   const philtrumGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.038, 6);
   const philtrumMat = getToonMaterial(0xe88a9e, 0.5);
   const philtrum = new THREE.Mesh(philtrumGeo, philtrumMat);
-  philtrum.position.set(0, 0.052, 0.640);
+  philtrum.position.set(0, 0.050, 0.642);
   headGroup.add(philtrum);
 
   // 4b. Expressive animated mouth with cavity, pink tongue, and cute buck teeth
@@ -117,26 +158,27 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   mouthGroup.position.set(0, 0.022, 0.636);
   headGroup.add(mouthGroup);
 
-  const mouthCavityGeo = new THREE.SphereGeometry(0.036, 12, 10);
+  const mouthCavityGeo = new THREE.SphereGeometry(0.038, 14, 10);
   mouthCavityGeo.scale(1.0, 0.85, 0.45);
-  const mouthCavityMat = getToonMaterial(0x822543, 0.45);
+  const mouthCavityMat = getToonMaterial(0x651528, 0.45);
   const mouthCavityMesh = new THREE.Mesh(mouthCavityGeo, mouthCavityMat);
   mouthGroup.add(mouthCavityMesh);
 
-  const tongueGeo = new THREE.SphereGeometry(0.022, 10, 8);
+  const tongueGeo = new THREE.SphereGeometry(0.024, 10, 8);
   tongueGeo.scale(1.1, 0.55, 0.65);
-  const tongueMat = getToonMaterial(0xff7594, 0.35);
+  const tongueMat = getToonMaterial(0xfa8097, 0.35);
   const tongueMesh = new THREE.Mesh(tongueGeo, tongueMat);
   tongueMesh.position.set(0, -0.012, 0.014);
   mouthGroup.add(tongueMesh);
 
-  const toothGeo = new THREE.BoxGeometry(0.012, 0.015, 0.008);
+  // Cute white buck teeth (from reference Nose & Mouth Detail)
+  const toothGeo = new THREE.BoxGeometry(0.013, 0.016, 0.009);
   const toothMat = getToonMaterial(0xffffff, 0.1);
   const leftTooth = new THREE.Mesh(toothGeo, toothMat);
-  leftTooth.position.set(-0.008, 0.015, 0.012);
+  leftTooth.position.set(-0.009, 0.015, 0.012);
   mouthGroup.add(leftTooth);
   const rightTooth = new THREE.Mesh(toothGeo, toothMat);
-  rightTooth.position.set(0.008, 0.015, 0.012);
+  rightTooth.position.set(0.009, 0.015, 0.012);
   mouthGroup.add(rightTooth);
 
   // Default resting smile scale
@@ -170,19 +212,18 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   headGroup.add(createWhisker(0.14, 0.02, 0.54, 0.44, 0.01, 0.42));
   headGroup.add(createWhisker(0.14, 0.0, 0.54, 0.41, -0.04, 0.43));
 
-  // 5. Small shiny black eyes (petite, deep obsidian black, not too big, with delicate sparkling catchlights)
-  const eyeMat = isHamster ? getShinyEyeMaterial() : getToonMaterial(0x0a0808, 0.1);
-  const pupilGeo = new THREE.SphereGeometry(0.062, 20, 18);
-  pupilGeo.scale(0.92, 1.05, 0.88);
+  // 5. Big sparkling Pixar anime eyes (from reference Eye Detail with catchlights)
+  const pupilGeo = new THREE.SphereGeometry(isHamster ? 0.084 : 0.062, 24, 20);
+  pupilGeo.scale(0.96, 1.05, 0.88);
 
   const leftEye = new THREE.Mesh(pupilGeo, eyeMat);
-  leftEye.position.set(-0.195, 0.145, 0.47);
+  leftEye.position.set(isHamster ? -0.21 : -0.195, isHamster ? 0.138 : 0.145, isHamster ? 0.45 : 0.47);
   leftEye.rotation.y = -0.22;
   leftEye.rotation.x = 0.04;
   headGroup.add(leftEye);
 
   const rightEye = new THREE.Mesh(pupilGeo, eyeMat);
-  rightEye.position.set(0.195, 0.145, 0.47);
+  rightEye.position.set(isHamster ? 0.21 : 0.195, isHamster ? 0.138 : 0.145, isHamster ? 0.45 : 0.47);
   rightEye.rotation.y = 0.22;
   rightEye.rotation.x = 0.04;
   headGroup.add(rightEye);
@@ -229,34 +270,34 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
 
   // 6. Chubby white cheek pouches (white cheeks with sweet soft blush)
   const cheeksGroup = new THREE.Group();
-  const cheekGeo = new THREE.SphereGeometry(0.14, 18, 16);
-  cheekGeo.scale(1.18, 0.82, 0.58);
+  const cheekGeo = new THREE.SphereGeometry(isHamster ? 0.20 : 0.14, 22, 18);
+  cheekGeo.scale(isHamster ? 1.18 : 1.18, isHamster ? 0.90 : 0.82, isHamster ? 0.72 : 0.58);
   const cheekMat = isHamster
-    ? getWhiteBellyFurMaterial(0xffffff, 0.8)
-    : getToonMaterial(palette.cheeks || 0xffffff, 0.55);
+    ? bellyMat
+    : getWhiteBellyFurMaterial(0xffffff, 0.8);
 
   const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
-  leftCheek.position.set(-0.32, 0.03, 0.41);
+  leftCheek.position.set(isHamster ? -0.29 : -0.32, isHamster ? -0.01 : 0.03, isHamster ? 0.36 : 0.41);
   leftCheek.rotation.y = -0.30;
   cheeksGroup.add(leftCheek);
 
   const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
-  rightCheek.position.set(0.32, 0.03, 0.41);
+  rightCheek.position.set(isHamster ? 0.29 : 0.32, isHamster ? -0.01 : 0.03, isHamster ? 0.36 : 0.41);
   rightCheek.rotation.y = 0.30;
   cheeksGroup.add(rightCheek);
 
   // Soft subtle pastel pink blush glow accentuating the white cheeks
-  const blushGeo = new THREE.SphereGeometry(0.07, 12, 10);
-  blushGeo.scale(1.1, 0.6, 0.35);
-  const blushMat = getToonMaterial(0xffc5d0, 0.65);
+  const blushGeo = new THREE.SphereGeometry(isHamster ? 0.085 : 0.07, 14, 12);
+  blushGeo.scale(1.15, 0.62, 0.32);
+  const blushMat = getToonMaterial(0xffaeb9, 0.65);
 
   const leftBlush = new THREE.Mesh(blushGeo, blushMat);
-  leftBlush.position.set(-0.335, -0.015, 0.445);
+  leftBlush.position.set(isHamster ? -0.31 : -0.335, isHamster ? -0.04 : -0.015, isHamster ? 0.44 : 0.445);
   leftBlush.rotation.y = -0.30;
   cheeksGroup.add(leftBlush);
 
   const rightBlush = new THREE.Mesh(blushGeo, blushMat);
-  rightBlush.position.set(0.335, -0.015, 0.445);
+  rightBlush.position.set(isHamster ? 0.31 : 0.335, isHamster ? -0.04 : -0.015, isHamster ? 0.44 : 0.445);
   rightBlush.rotation.y = 0.30;
   cheeksGroup.add(rightBlush);
 
@@ -280,11 +321,19 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
 
   // 7. Fluffy rounded ears (Light golden-cream beige outside, light pink inside)
   const leftEar = new THREE.Group();
-  leftEar.position.set(-0.35, 0.42, -0.02);
+  leftEar.position.set(isHamster ? -0.34 : -0.35, isHamster ? 0.41 : 0.42, -0.02);
+  if (isHamster) {
+    leftEar.rotation.z = -0.24;
+    leftEar.rotation.y = 0.22;
+  }
   headGroup.add(leftEar);
 
   const rightEar = new THREE.Group();
-  rightEar.position.set(0.35, 0.42, -0.02);
+  rightEar.position.set(isHamster ? 0.34 : 0.35, isHamster ? 0.41 : 0.42, -0.02);
+  if (isHamster) {
+    rightEar.rotation.z = 0.24;
+    rightEar.rotation.y = -0.22;
+  }
   headGroup.add(rightEar);
 
   let earOuterGeo: THREE.BufferGeometry;
@@ -297,16 +346,16 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
     rightEar.position.set(0.25, 0.55, -0.05);
   } else {
     // Hamster round, cup-shaped fluffy ears
-    earOuterGeo = new THREE.SphereGeometry(0.16, 16, 14);
+    earOuterGeo = new THREE.SphereGeometry(0.16, 18, 16);
     earOuterGeo.scale(1.0, 1.05, 0.38);
-    earInnerGeo = new THREE.SphereGeometry(0.11, 14, 12);
+    earInnerGeo = new THREE.SphereGeometry(0.115, 16, 14);
     earInnerGeo.scale(0.92, 0.96, 0.28);
   }
 
   const earOuterMat = isHamster
-    ? getFluffyFurMaterial(palette.earsOuter || palette.body, 0.82)
+    ? bodyMat
     : getToonMaterial(palette.earsOuter || palette.body, 0.5);
-  const earInnerMat = getToonMaterial(palette.earsInner || 0xffd1dc, 0.4);
+  const earInnerMat = getToonMaterial(isHamster ? 0xffa8b2 : (palette.earsInner || 0xffd1dc), 0.4);
 
   const leftEarOuter = new THREE.Mesh(earOuterGeo, earOuterMat);
   leftEar.add(leftEarOuter);
@@ -320,9 +369,20 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   rightEarInner.position.set(0, 0, 0.04);
   rightEar.add(rightEarInner);
 
-  // 8. Small front paws (delicate baby-pink hands with tiny digit pads held adorably against the chest)
-  const pawMat = isHamster ? getSmallPawMaterial() : getToonMaterial(palette.feet || palette.body, 0.5);
+  // Cute white fur tufts at the base of the ear opening
+  if (isHamster) {
+    const earTuftGeo = new THREE.SphereGeometry(0.048, 10, 8);
+    earTuftGeo.scale(1.2, 0.7, 0.7);
+    const leftTuft = new THREE.Mesh(earTuftGeo, bellyMat);
+    leftTuft.position.set(0.02, -0.08, 0.03);
+    leftEar.add(leftTuft);
 
+    const rightTuft = new THREE.Mesh(earTuftGeo, bellyMat);
+    rightTuft.position.set(-0.02, -0.08, 0.03);
+    rightEar.add(rightTuft);
+  }
+
+  // 8. Small front paws (delicate baby-pink hands with tiny digit pads held adorably against the chest)
   // Arm upper fluffy sleeve
   const armSleeveGeo = new THREE.SphereGeometry(0.09, 14, 12);
   armSleeveGeo.scale(0.85, 1.1, 1.1);
@@ -416,10 +476,10 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   rightLeg.add(rightLegMesh);
   bodyGroup.add(rightLeg);
 
-  // 10. Tiny fluffy cotton-tail
-  const tailGeo = new THREE.SphereGeometry(0.085, 14, 12);
-  const tailMesh = new THREE.Mesh(tailGeo, bodyMat);
-  tailMesh.position.set(0, -0.32, -0.52);
+  // 10. Fluffy cotton-tail
+  const tailGeo = new THREE.SphereGeometry(isHamster ? 0.12 : 0.085, 16, 14);
+  const tailMesh = new THREE.Mesh(tailGeo, isHamster ? bellyMat : bodyMat);
+  tailMesh.position.set(0, -0.30, -0.52);
   bodyGroup.add(tailMesh);
 
   // Accessories group

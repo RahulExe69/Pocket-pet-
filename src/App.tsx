@@ -81,6 +81,24 @@ export default function App() {
   const [activeMiniGame, setActiveMiniGame] = useState<MultiplayerMiniGameType | null>(null);
   const [currentRoom, setCurrentRoom] = useState<MultiplayerRoom | null>(() => multiplayerManager.getCurrentRoom());
 
+  // 3D Pet Model Graphics Style ('textured' = authentic 3D GLB model from pets.glb, 'mochi' = stylized mochi)
+  const [modelStyle, setModelStyle] = useState<'textured' | 'mochi'>(() => {
+    try {
+      return (localStorage.getItem('pocket_pet_model_style') as 'textured' | 'mochi') || 'textured';
+    } catch {
+      return 'textured';
+    }
+  });
+
+  const handleToggleModelStyle = (style: 'textured' | 'mochi') => {
+    setModelStyle(style);
+    try {
+      localStorage.setItem('pocket_pet_model_style', style);
+    } catch {
+      // ignore
+    }
+  };
+
   // Temporary custom pet reaction speech
   const [customSpeech, setCustomSpeech] = useState<string | null>(null);
   const speechTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -709,6 +727,8 @@ export default function App() {
             friendPet={friendPet}
             onTapFloorMove={handleTapFloorMove}
             activeGame={activeMiniGame}
+            modelStyle={modelStyle}
+            onToggleModelStyle={handleToggleModelStyle}
           />
         )}
 
@@ -798,6 +818,8 @@ export default function App() {
           notificationsEnabled={notificationsEnabled}
           onToggleNotifications={(enabled) => setNotificationsEnabled(enabled)}
           onResetPet={handleResetPet}
+          modelStyle={modelStyle}
+          onToggleModelStyle={handleToggleModelStyle}
         />
 
         {/* Mini Games Hub */}

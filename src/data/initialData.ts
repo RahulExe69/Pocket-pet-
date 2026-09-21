@@ -54,6 +54,42 @@ export const PET_CONFIGS: Record<PetType, {
     defaultColor: '#ffffff',
     secondaryColor: '#33333e',
   },
+  chinchilla: {
+    name: 'Puff',
+    species: 'Chinchilla',
+    description: 'Incredibly soft silvery-gray coat with big curious ears and acrobatic hops!',
+    favoriteFoodId: 'seeds',
+    soundType: 'squeak',
+    defaultColor: '#a4b0be',
+    secondaryColor: '#f1f2f6',
+  },
+  ferret: {
+    name: 'Bandit',
+    species: 'Ferret',
+    description: 'Playful, curious explorer who loves weaving through tunnels and shiny toys.',
+    favoriteFoodId: 'fish-treat',
+    soundType: 'dook',
+    defaultColor: '#747d8c',
+    secondaryColor: '#ced6e0',
+  },
+  hedgehog: {
+    name: 'Spike',
+    species: 'Hedgehog',
+    description: 'Cute quill-backed snuggler with pink nose and tiny trotters who curls into a soft ball.',
+    favoriteFoodId: 'apple',
+    soundType: 'snuffle',
+    defaultColor: '#8c7ae6',
+    secondaryColor: '#f5f6fa',
+  },
+  gerbil: {
+    name: 'Pip',
+    species: 'Gerbil',
+    description: 'Quick, lively little jumper with tufted tail and endless sand-burrowing energy!',
+    favoriteFoodId: 'seeds',
+    soundType: 'chirp',
+    defaultColor: '#e1b12c',
+    secondaryColor: '#f5cd79',
+  },
 };
 
 export const FOOD_CATALOG: FoodItem[] = [
