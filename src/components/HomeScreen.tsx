@@ -5,6 +5,7 @@ import {
   Gift,
   Sparkles,
   ShoppingBag,
+  ShoppingCart,
   Shirt,
   X,
   ChevronRight,
@@ -18,6 +19,14 @@ import {
   HelpCircle,
   Keyboard,
   Square,
+  Smile,
+  Utensils,
+  Bath,
+  Moon,
+  Plane,
+  Sun,
+  Droplets,
+  Music,
 } from 'lucide-react';
 import { PetState, PetMood, FoodItem, MultiplayerRoom, MultiplayerPlayer, MultiplayerMiniGameType } from '../types';
 import { PetScene3D } from './3d/PetScene3D';
@@ -34,6 +43,7 @@ import {
 } from '../utils/speech';
 import { askGeminiHamster, ChatHistoryItem } from '../services/gemini';
 import { soundManager } from '../utils/audio';
+import { PetFaceAvatar } from './PetFaceAvatar';
 
 interface HomeScreenProps {
   pet: PetState;
@@ -63,6 +73,9 @@ interface HomeScreenProps {
   friendPet?: MultiplayerPlayer | null;
   onTapFloorMove?: (pos: { x: number; z: number }) => void;
   activeGame?: MultiplayerMiniGameType | null;
+  modelStyle?: 'textured' | 'mochi';
+  onToggleModelStyle?: (style: 'textured' | 'mochi') => void;
+  onOpenPetSelection?: () => void;
 }
 
 // 3 Distinct Foods for Feeding the Hamster
@@ -92,7 +105,7 @@ const THREE_FOODS: (FoodItem & { colorBg: string; borderColor: string; tag: stri
     energyBoost: 14,
     description: 'Fresh, juicy garden carrot packed with vitamins!',
     levelRequired: 1,
-    favoriteFor: ['bunny'],
+    favoriteFor: ['marmot', 'mountain_goat'],
     colorBg: 'bg-orange-50 hover:bg-orange-100/80',
     borderColor: 'border-orange-300',
     tag: '🥕 Garden Fresh',
@@ -141,6 +154,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   friendPet = null,
   onTapFloorMove,
   activeGame = null,
+  modelStyle = 'textured',
+  onToggleModelStyle,
+  onOpenPetSelection,
 }) => {
   const [isDrinking, setIsDrinking] = useState<boolean>(false);
   const [isDancing, setIsDancing] = useState<boolean>(false);
@@ -767,69 +783,67 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <div className="absolute inset-0 bg-indigo-950/70 backdrop-blur-[0.5px] pointer-events-none z-10" />
       )}
 
-      {/* TOP HEADER: Level, Coins, Navigation icons */}
-      <header className="relative z-20 px-3 pt-2.5 pb-1 flex items-center justify-between gap-2 shrink-0">
-        {/* Left: Pet Passport / Level */}
+      {/* TOP HEADER: Talking Tom 2 Style Header */}
+      <header className="relative z-20 px-3 pt-2 pb-1 shrink-0 flex items-center justify-between gap-2">
+        {/* Left: Talking Tom 2 Circular Level Badge with XP Progress Ring */}
         <button
           id="btn-open-profile"
           onClick={onOpenProfile}
-          className={`flex items-center gap-1.5 p-1 pr-2.5 rounded-2xl border shadow-xs transition-all active:scale-95 cursor-pointer ${
-            pet.isSleeping
-              ? 'bg-slate-800/90 border-slate-700 text-white'
-              : 'bg-white/95 border-pink-200/90 text-stone-800 hover:bg-pink-50/50'
-          }`}
+          className="relative flex items-center justify-center p-1 active:scale-95 transition-transform cursor-pointer group"
           title="View Pet Profile & Passport"
         >
-          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-sm overflow-hidden shrink-0 border border-pink-200/60 shadow-xs">
-            {pet.type === 'hamster' ? (
-              <img
-                src="/pocket_pet_icon.png"
-                alt={pet.name}
-                className="w-full h-full object-cover rounded-xl"
-                referrerPolicy="no-referrer"
+          {/* Circular SVG XP progress ring */}
+          <div className="relative w-12 h-12 flex items-center justify-center">
+            <svg className="w-12 h-12 -rotate-90" viewBox="0 0 44 44">
+              {/* Background ring */}
+              <circle
+                cx="22"
+                cy="22"
+                r="18"
+                fill="none"
+                stroke="#e2e8f0"
+                strokeWidth="3.5"
               />
-            ) : (
-              <>
-                {pet.type === 'cat' && '🐱'}
-                {pet.type === 'dog' && '🐶'}
-                {pet.type === 'bunny' && '🐰'}
-                {pet.type === 'panda' && '🐼'}
-              </>
-            )}
-          </div>
-          <div className="text-left">
-            <div className="font-bubble text-xs font-bold leading-tight flex items-center gap-1">
-              <span className="truncate max-w-[85px]">{pet.name}</span>
-              <span className="text-[9px] bg-pink-500 text-white px-1 py-0.5 rounded-md font-bold">
-                L{pet.level}
-              </span>
+              {/* Animated Lime XP ring */}
+              <circle
+                cx="22"
+                cy="22"
+                r="18"
+                fill="none"
+                stroke="#4ade80"
+                strokeWidth="3.5"
+                strokeDasharray={113.1}
+                strokeDashoffset={113.1 - (113.1 * Math.min(100, Math.max(10, (pet.experience || 0) % 100))) / 100}
+                strokeLinecap="round"
+                className="transition-all duration-700"
+              />
+            </svg>
+            {/* Center Purple Level Circle */}
+            <div className="absolute inset-1.5 rounded-full bg-gradient-to-br from-purple-500 via-indigo-500 to-purple-600 flex items-center justify-center text-white font-bubble font-extrabold text-sm shadow-md border border-white/60 group-hover:scale-105 transition-transform">
+              {pet.level}
             </div>
           </div>
         </button>
 
-        {/* Center: Coins Badge */}
+        {/* Center: Dark Capsule Coins Pill (Talking Tom 2 style) */}
         <div
-          className={`flex items-center gap-1 px-3 py-1 rounded-2xl border shadow-xs font-bubble text-xs font-bold ${
-            pet.isSleeping
-              ? 'bg-slate-800/90 border-slate-700 text-amber-300'
-              : 'bg-white/95 border-amber-200 text-amber-800 shadow-amber-900/5'
-          }`}
+          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 backdrop-blur-md border-2 border-slate-700/80 shadow-lg font-bubble text-sm sm:text-base font-extrabold text-white"
           title="Your Pocket Coins"
         >
-          <span className="text-sm">🪙</span>
-          <span className="font-extrabold">{pet.coins}</span>
+          <span className="tracking-wide">{pet.coins.toLocaleString()}</span>
+          <span className="text-base sm:text-lg">🪙</span>
         </div>
 
-        {/* Right Tools: Daily Reward & Settings */}
+        {/* Right Tools: Daily Gift & Settings (Talking Tom 2 style) */}
         <div className="flex items-center gap-1.5">
           {/* Daily reward gift button */}
           <button
             id="btn-open-daily-reward"
             onClick={onOpenDailyRewards}
-            className="relative p-2 rounded-2xl bg-white/95 border border-pink-200 shadow-xs text-amber-700 hover:bg-amber-50 active:scale-95 transition-transform cursor-pointer"
+            className="relative w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center border-2 border-white/70 shadow-md active:scale-95 transition-transform cursor-pointer"
             title="Claim Daily Login Gift"
           >
-            <Gift size={17} />
+            <Gift size={20} />
             {dailyRewardAvailable && (
               <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-500 rounded-full border-2 border-white animate-ping" />
             )}
@@ -839,16 +853,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             id="btn-open-settings"
             onClick={onOpenSettings}
-            className="p-2 rounded-2xl bg-white/95 border border-stone-200 shadow-xs text-stone-600 hover:bg-stone-50 active:scale-95 transition-transform cursor-pointer"
+            className="w-10 h-10 rounded-2xl bg-white/95 text-stone-700 flex items-center justify-center border-2 border-stone-200 shadow-md active:scale-95 transition-transform cursor-pointer hover:bg-stone-50"
             title="Settings & Audio Options"
           >
-            <Settings size={17} />
+            <Settings size={19} />
           </button>
         </div>
       </header>
 
-      {/* SUB-RIBBON: Language, Pet ID, Multiplayer & Games (Single Non-Wrapping Row) */}
-      <div className="relative z-20 px-3 py-0.5 flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+      {/* SUB-RIBBON: Language Selector, Pet ID, Multiplayer (Compact Floating Game Pills) */}
+      <div className="relative z-20 px-3 py-0.5 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar shrink-0 text-[11px]">
+        {/* Pet Avatar & Quick Passport Button */}
+        <button
+          id="btn-open-profile-pill"
+          onClick={onOpenProfile}
+          className="shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/85 backdrop-blur-xs border border-pink-200/80 shadow-2xs font-bubble text-[11px] cursor-pointer hover:bg-white text-stone-800 active:scale-95 transition-all"
+          title="View Passport & Profile"
+        >
+          <PetFaceAvatar type={pet.type} size={18} />
+          <span className="font-bold truncate max-w-[70px]">{pet.name}</span>
+        </button>
+
+        {/* Quick Swap Pet Companion Button (50 Species) */}
+        {onOpenPetSelection && (
+          <button
+            id="btn-quick-swap-pet"
+            onClick={onOpenPetSelection}
+            className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-400 to-orange-400 text-stone-900 font-bubble text-[10px] font-black shadow-2xs hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            title="Swap your active pet companion anytime (50 species)"
+          >
+            <span>🐾</span>
+            <span>Swap Pet</span>
+          </button>
+        )}
+
         {/* Unique Pet ID */}
         <button
           id="pet-id-top-display"
@@ -860,19 +898,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               setTimeout(() => setPetIdCopied(false), 2000);
             }
           }}
-          className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-xl border shadow-xs font-bubble text-xs cursor-pointer active:scale-95 transition-all ${
-            pet.isSleeping
-              ? 'bg-slate-800/90 border-slate-700 text-pink-300'
-              : 'bg-white/90 border-pink-200 text-pink-800 hover:bg-pink-50'
-          }`}
+          className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/80 backdrop-blur-xs border border-pink-200/80 shadow-2xs font-bubble text-[10px] cursor-pointer active:scale-95 transition-all text-pink-900"
           title="Tap to copy your Pet ID"
         >
-          <span className="text-xs">🏷️</span>
-          <span className="font-mono font-bold text-[11px] text-pink-900">
+          <span>🏷️</span>
+          <span className="font-mono font-bold">
             {pet.id || 'HAM-8821'}
           </span>
           {petIdCopied && (
-            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 py-0.2 rounded-full border border-emerald-200 animate-fade-in">
+            <span className="text-[9px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded-full border border-emerald-200">
               Copied!
             </span>
           )}
@@ -881,7 +915,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* 3 Top Language Buttons: [BN] [HI] [EN] */}
         <div
           id="top-language-selector"
-          className="shrink-0 flex items-center bg-white/95 backdrop-blur-xs rounded-xl border border-pink-200 p-0.5 shadow-xs font-bubble text-xs"
+          className="shrink-0 flex items-center bg-white/85 backdrop-blur-xs rounded-lg border border-pink-200/80 p-0.5 shadow-2xs font-bubble text-[10px]"
           title="Select Talking Language"
         >
           {(['BN', 'HI', 'EN'] as TalkingLanguage[]).map((lang) => (
@@ -889,146 +923,40 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               key={lang}
               id={`btn-top-lang-${lang.toLowerCase()}`}
               onClick={() => handleLanguageSelect(lang)}
-              className={`px-1.5 py-0.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
+              className={`px-2 py-0.5 rounded font-bold text-[10px] transition-all cursor-pointer ${
                 selectedLanguage === lang
-                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xs'
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-2xs'
                   : 'text-stone-600 hover:text-pink-600 hover:bg-pink-50'
               }`}
             >
-              [{lang}]
+              {lang}
             </button>
           ))}
         </div>
 
-        {/* Multiplayer Room Button */}
+        {/* Multiplayer Room Badge */}
         <button
           id="btn-open-multiplayer"
           onClick={onOpenMultiplayer}
-          className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-xl border shadow-xs transition-all active:scale-95 font-bubble text-xs font-bold cursor-pointer ${
+          className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg border shadow-2xs transition-all active:scale-95 font-bubble text-[10px] font-bold cursor-pointer ${
             currentRoom
-              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400 shadow-xs'
-              : 'bg-white/90 border-pink-200 text-pink-700 hover:bg-pink-50'
+              ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-pink-400'
+              : 'bg-white/80 border-pink-200/80 text-pink-700 hover:bg-pink-50'
           }`}
           title="Play with a friend in Multiplayer"
         >
-          <Users size={12} />
-          <span className="text-[11px]">{currentRoom ? `#${currentRoom.code}` : 'Multi'}</span>
+          <Users size={11} />
+          <span>{currentRoom ? `#${currentRoom.code}` : 'Multiplayer'}</span>
           {currentRoom?.guest && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           )}
         </button>
-
-        {/* Mini-Games Button */}
-        <button
-          id="btn-open-multiplayer-minigames"
-          onClick={onOpenMiniGames}
-          className="shrink-0 flex items-center gap-1 px-2 py-1 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white border border-purple-400 shadow-xs font-bubble text-xs font-bold hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-          title="Mini-Games: Race, Hide & Seek, Ball Play"
-        >
-          <Gamepad2 size={12} />
-          <span className="text-[11px]">Games</span>
-        </button>
       </div>
 
-      {/* METERS STATUS BAR */}
-      <div className="relative z-20 px-3 py-1 shrink-0">
-        <div
-          className={`grid grid-cols-4 gap-2 p-2 rounded-2xl border shadow-xs transition-colors ${
-            pet.isSleeping
-              ? 'bg-slate-900/80 border-slate-700 text-white'
-              : 'bg-white/90 backdrop-blur-xs border-pink-200/80 text-stone-700'
-          }`}
-        >
-          {/* Hunger Meter */}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
-              <span>🍖 Hunger</span>
-              <span>{pet.stats.hunger}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full rounded-full ${
-                  pet.stats.hunger < 30
-                    ? 'bg-rose-500'
-                    : pet.stats.hunger < 60
-                    ? 'bg-amber-500'
-                    : 'bg-emerald-500'
-                }`}
-                animate={{ width: `${pet.stats.hunger}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-          </div>
-
-          {/* Happiness Meter */}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
-              <span>❤️ Happy</span>
-              <span>{pet.stats.happiness}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full rounded-full ${
-                  pet.stats.happiness < 30
-                    ? 'bg-rose-500'
-                    : pet.stats.happiness < 60
-                    ? 'bg-amber-500'
-                    : 'bg-pink-500'
-                }`}
-                animate={{ width: `${pet.stats.happiness}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-          </div>
-
-          {/* Energy Meter */}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
-              <span>⚡ Energy</span>
-              <span>{pet.stats.energy}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full rounded-full ${
-                  pet.stats.energy < 30
-                    ? 'bg-rose-500'
-                    : pet.stats.energy < 60
-                    ? 'bg-amber-500'
-                    : 'bg-yellow-400'
-                }`}
-                animate={{ width: `${pet.stats.energy}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-          </div>
-
-          {/* Cleanliness Meter */}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex justify-between text-[10px] sm:text-[11px] font-bold">
-              <span>🧼 Clean</span>
-              <span>{pet.stats.cleanliness}%</span>
-            </div>
-            <div className="w-full h-1.5 bg-stone-200 rounded-full overflow-hidden">
-              <motion.div
-                className={`h-full rounded-full ${
-                  pet.stats.cleanliness < 30
-                    ? 'bg-rose-500'
-                    : pet.stats.cleanliness < 60
-                    ? 'bg-amber-500'
-                    : 'bg-sky-400'
-                }`}
-                animate={{ width: `${pet.stats.cleanliness}%` }}
-                transition={{ duration: 0.5 }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN PET ROOM INTERACTIVE 3D STAGE */}
+      {/* MAIN PET ROOM INTERACTIVE 3D STAGE (Maximized Height like Talking Tom 2) */}
       <div
         id="pet-room-stage"
-        className="relative flex-1 w-full min-h-[190px] flex flex-col items-center justify-center my-0.5 z-10 overflow-hidden"
+        className="relative flex-1 w-full min-h-[220px] flex flex-col items-center justify-center my-0.5 z-10 overflow-hidden"
       >
         {/* Full 3D Interactive WebGL Scene */}
         <PetScene3D
@@ -1050,18 +978,88 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           onTapFloorMove={onTapFloorMove}
           activeGame={activeGame}
           isTalking={isTalking}
+          modelStyle={modelStyle}
         />
 
-        {/* Floating Quick Closet Button (Top Left of 3D Scene) */}
-        <div className="absolute top-2 left-2 z-20 pointer-events-auto">
+        {/* LEFT FLOATING BUTTONS: Shop & Closet & 3D Style (Talking Tom 2 Style) */}
+        <div className="absolute top-2 left-2 z-20 flex flex-col gap-2 pointer-events-auto">
+          {/* Shop / Boutique (Shopping Cart icon like Talking Tom 2) */}
+          <button
+            id="btn-quick-shop"
+            onClick={onOpenShop}
+            className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center border-2 border-white/80 shadow-md active:scale-95 transition-transform cursor-pointer"
+            title="Open Boutique Shop"
+          >
+            <ShoppingCart size={20} />
+          </button>
+
+          {/* Closet / Wardrobe (Outfit / Chair icon like Talking Tom 2) */}
           <button
             id="btn-quick-closet"
             onClick={onOpenCustomization}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white/90 backdrop-blur-md border border-pink-200/90 shadow-xs text-[11px] font-bubble font-bold text-pink-700 hover:bg-pink-50 active:scale-95 transition-all cursor-pointer"
+            className="w-11 h-11 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 text-white flex items-center justify-center border-2 border-white/80 shadow-md active:scale-95 transition-transform cursor-pointer"
             title="Open Wardrobe & Closet"
           >
-            <Shirt size={12} />
-            <span>Closet</span>
+            <Shirt size={20} />
+          </button>
+
+          {/* Quick 3D Model Style Toggle (Real 3D GLB vs Mochi) */}
+          <button
+            id="btn-quick-model-style"
+            onClick={() => {
+              const nextStyle = modelStyle === 'textured' ? 'mochi' : 'textured';
+              if (onToggleModelStyle) onToggleModelStyle(nextStyle);
+            }}
+            className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex flex-col items-center justify-center border-2 border-white/80 shadow-md active:scale-95 transition-transform cursor-pointer"
+            title={`Current: ${modelStyle === 'textured' ? 'Real 3D GLB Model' : 'Stylized Mochi Model'}. Tap to switch!`}
+          >
+            <span className="text-base leading-none">{modelStyle === 'textured' ? '✨' : '🍡'}</span>
+            <span className="text-[8px] font-black font-bubble leading-none mt-0.5">{modelStyle === 'textured' ? '3D' : 'Mochi'}</span>
+          </button>
+        </div>
+
+        {/* RIGHT FLOATING BUTTONS: Dance, Sing, Water (Talking Tom 2 Room Activities) */}
+        <div className="absolute top-2 right-2 z-20 flex flex-col gap-2 pointer-events-auto">
+          {/* Dance Button */}
+          <button
+            id="btn-floating-dance"
+            onClick={handleDanceClick}
+            className={`w-11 h-11 rounded-2xl text-white flex items-center justify-center border-2 border-white/80 shadow-md active:scale-95 transition-transform cursor-pointer ${
+              isDancing
+                ? 'bg-gradient-to-br from-pink-500 to-rose-600 ring-2 ring-pink-300 animate-pulse'
+                : 'bg-gradient-to-br from-fuchsia-500 to-purple-600'
+            }`}
+            title="Dance Routine"
+          >
+            <span className="text-xl">💃</span>
+          </button>
+
+          {/* Sing Button */}
+          <button
+            id="btn-floating-sing"
+            onClick={handleSingClick}
+            className={`w-11 h-11 rounded-2xl text-white flex items-center justify-center border-2 border-white/80 shadow-md active:scale-95 transition-transform cursor-pointer ${
+              isSinging
+                ? 'bg-gradient-to-br from-purple-500 to-indigo-600 ring-2 ring-purple-300 animate-pulse'
+                : 'bg-gradient-to-br from-indigo-500 to-purple-600'
+            }`}
+            title="Sing Song"
+          >
+            <span className="text-xl">🎤</span>
+          </button>
+
+          {/* Fresh Water Button */}
+          <button
+            id="btn-floating-water"
+            onClick={handleWaterClick}
+            className={`w-11 h-11 rounded-2xl text-white flex items-center justify-center border-2 border-white/80 shadow-md active:scale-95 transition-transform cursor-pointer ${
+              isDrinking
+                ? 'bg-gradient-to-br from-sky-400 to-blue-600 ring-2 ring-sky-300'
+                : 'bg-gradient-to-br from-sky-400 to-cyan-500'
+            }`}
+            title="Give Fresh Spring Water"
+          >
+            <span className="text-xl">💧</span>
           </button>
         </div>
 
@@ -1134,71 +1132,44 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </AnimatePresence>
       </div>
 
-      {/* 2 MAIN ACTION BUTTONS: BUTTON 1 = REPEAT & BUTTON 2 = ANSWER */}
-      <div className="relative z-20 px-3 pt-0.5 pb-1.5 flex items-stretch justify-center gap-1.5 sm:gap-2 shrink-0">
-        {/* BUTTON 1 = REPEAT */}
-        <div className="flex-1 min-w-0 flex items-stretch gap-1">
+      {/* TALKING DOCK: REPEAT & ANSWER (Compact Talking Tom 2 Game Style Action Dock) */}
+      <div className="relative z-20 px-3 pt-0.5 pb-1 flex items-center justify-center gap-1.5 shrink-0">
+        {/* BUTTON 1 = REPEAT (Continuous Listening & High-Pitch Hamster Voice) */}
+        <div className="flex-1 min-w-0 flex items-center gap-1">
           <button
             id="btn-action-repeat"
             onClick={handleDirectRepeat}
-            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-2.5 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none min-h-[50px] ${
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border-2 font-bubble font-extrabold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer select-none h-11 ${
               isContinuousRepeat
                 ? repeatPhase === 'speaking'
-                  ? 'bg-gradient-to-r from-amber-500 via-pink-500 to-rose-500 text-white border-pink-400 ring-4 ring-pink-300/80 shadow-lg scale-[1.01]'
-                  : 'bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white border-pink-400 ring-4 ring-pink-300/80 shadow-lg scale-[1.01] animate-pulse'
-                : 'bg-gradient-to-r from-pink-50 via-white to-rose-50 hover:from-pink-100 hover:to-rose-100 text-stone-800 border-pink-300 hover:border-pink-400'
+                  ? 'bg-gradient-to-r from-amber-500 via-rose-500 to-pink-500 text-white border-white ring-2 ring-amber-300'
+                  : 'bg-gradient-to-r from-pink-500 via-rose-500 to-pink-600 text-white border-white ring-2 ring-pink-300 animate-pulse'
+                : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white border-white/80 hover:from-pink-600 hover:to-rose-600'
             }`}
-            title={
-              isContinuousRepeat
-                ? 'Continuous Repeat Active - Tap to Stop'
-                : 'Button 1: REPEAT - Tap once for Continuous Repeat Mode (auto listen & repeat)!'
-            }
+            title="Button 1: REPEAT - Tap once for Continuous Repeat Mode (auto listen & repeat)!"
           >
-            <div
-              className={`p-1.5 sm:p-2 rounded-xl transition-transform shrink-0 ${
-                isContinuousRepeat
-                  ? 'bg-white text-pink-600 shadow-md scale-105'
-                  : 'bg-pink-500 text-white shadow-xs'
-              }`}
-            >
-              {isContinuousRepeat ? (
-                repeatPhase === 'speaking' ? (
-                  <Volume2 className="animate-bounce" size={16} />
-                ) : (
-                  <Mic className="animate-bounce" size={16} />
-                )
+            {isContinuousRepeat ? (
+              repeatPhase === 'speaking' ? (
+                <Volume2 className="animate-bounce shrink-0" size={16} />
               ) : (
-                <RotateCcw size={16} />
-              )}
-            </div>
-            <div className="flex flex-col text-left leading-tight min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-tight truncate">
-                  {isContinuousRepeat
-                    ? repeatPhase === 'speaking'
-                      ? 'Speaking...'
-                      : 'Listening...'
-                    : 'REPEAT'}
-                </span>
-                <span className="text-[9px] bg-pink-100/90 text-pink-700 px-1 py-0.2 rounded font-mono font-bold shrink-0">
-                  [{selectedLanguage}]
-                </span>
-              </div>
-              <span
-                className={`text-[10px] sm:text-[11px] font-bubble truncate ${
-                  isContinuousRepeat ? 'text-pink-100 font-bold' : 'text-pink-600'
-                }`}
-              >
-                {isContinuousRepeat
-                  ? repeatPhase === 'speaking'
-                    ? 'Hamster repeats 🐹'
-                    : 'Speak anytime 🎙️'
-                  : 'Continuous 🎙️'}
-              </span>
-            </div>
+                <Mic className="animate-pulse shrink-0" size={16} />
+              )
+            ) : (
+              <Mic size={16} className="shrink-0" />
+            )}
+            <span className="truncate">
+              {isContinuousRepeat
+                ? repeatPhase === 'speaking'
+                  ? 'Speaking...'
+                : 'Listening...'
+                : 'Repeat'}
+            </span>
+            <span className="text-[9px] bg-black/20 text-white px-1.5 py-0.2 rounded-full font-mono font-bold shrink-0">
+              {selectedLanguage}
+            </span>
           </button>
 
-          {/* Small Stop Control (appears while Continuous Repeat Mode is active) */}
+          {/* Stop Control for Continuous Repeat Mode */}
           <AnimatePresence>
             {isContinuousRepeat && (
               <motion.button
@@ -1210,196 +1181,189 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   e.stopPropagation();
                   stopContinuousRepeat();
                 }}
-                className="px-2.5 flex items-center justify-center gap-1 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 text-white font-bubble font-bold text-xs shadow-md border border-red-400 active:scale-90 transition-transform cursor-pointer select-none shrink-0"
+                className="px-2 h-11 flex items-center justify-center gap-1 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bubble font-bold text-xs shadow-md border-2 border-white active:scale-90 transition-transform cursor-pointer select-none shrink-0"
                 title="Stop Continuous Repeat Mode"
               >
-                <Square size={11} fill="currentColor" />
-                <span className="text-[10px] uppercase tracking-wider font-extrabold whitespace-nowrap">Stop</span>
+                <Square size={10} fill="currentColor" />
+                <span className="text-[10px] font-extrabold uppercase">Stop</span>
               </motion.button>
             )}
           </AnimatePresence>
-
-          <button
-            onClick={handleRepeatClick}
-            title="Type text for hamster to repeat"
-            className="w-8 sm:w-9 flex items-center justify-center rounded-2xl bg-pink-100 hover:bg-pink-200 text-pink-700 border border-pink-300 shadow-xs cursor-pointer active:scale-95 transition-transform shrink-0"
-          >
-            <Keyboard size={14} />
-          </button>
         </div>
 
-        {/* BUTTON 2 = ANSWER */}
-        <div className="flex-1 min-w-0 flex items-stretch gap-1">
+        {/* BUTTON 2 = ANSWER (Gemini AI Smart Q&A) */}
+        <div className="flex-1 min-w-0 flex items-center">
           <button
             id="btn-action-answer"
             onClick={handleDirectAnswer}
-            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2 px-2.5 rounded-2xl border font-bubble font-bold transition-all shadow-md active:scale-95 cursor-pointer select-none min-h-[50px] ${
+            className={`w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl border-2 font-bubble font-extrabold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer select-none h-11 ${
               (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
-                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-purple-400 ring-4 ring-purple-300/80 shadow-lg scale-[1.01] animate-pulse'
-                : 'bg-gradient-to-r from-purple-50 via-white to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-stone-800 border-purple-300 hover:border-purple-400'
+                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 text-white border-white ring-2 ring-purple-300 animate-pulse'
+                : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-white/80 hover:from-purple-700 hover:to-indigo-700'
             }`}
-            title="Button 2: ANSWER - Tap to ask question, hamster answers smartly with knowledge in BN/HI/EN!"
+            title="Button 2: ANSWER - Tap to ask a question, hamster answers smartly in your language!"
           >
-            <div
-              className={`p-1.5 sm:p-2 rounded-xl transition-transform shrink-0 ${
-                (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
-                  ? 'bg-white text-purple-700 shadow-md scale-105'
-                  : 'bg-purple-600 text-white shadow-xs'
-              }`}
-            >
-              {isDirectListening && directVoiceMode === 'answer' ? (
-                <Mic className="animate-bounce" size={16} />
-              ) : isAnswerThinking ? (
-                <Sparkles className="animate-spin" size={16} />
-              ) : (
-                <Bot size={16} />
-              )}
-            </div>
-            <div className="flex flex-col text-left leading-tight min-w-0 flex-1">
-              <div className="flex items-center gap-1">
-                <span className="text-xs sm:text-sm font-extrabold font-bubble tracking-tight truncate">
-                  {isDirectListening && directVoiceMode === 'answer'
-                    ? 'Listening...'
-                    : isAnswerThinking
-                    ? 'Thinking...'
-                    : 'ANSWER'}
-                </span>
-                <span className="text-[9px] bg-purple-100/90 text-purple-700 px-1 py-0.2 rounded font-mono font-bold shrink-0">
-                  [{selectedLanguage}]
-                </span>
-              </div>
-              <span
-                className={`text-[10px] sm:text-[11px] font-bubble truncate ${
-                  (isDirectListening && directVoiceMode === 'answer') || isAnswerThinking
-                    ? 'text-purple-100 font-bold'
-                    : 'text-purple-600'
-                }`}
-              >
-                {isDirectListening && directVoiceMode === 'answer'
-                  ? 'Ask question ❓'
-                  : isAnswerThinking
-                  ? 'Gemini AI 🐹✨'
-                  : 'Smart Q&A 💡'}
-              </span>
-            </div>
-          </button>
-          <button
-            onClick={handleChatClick}
-            title="Type question for smart answer"
-            className="w-8 sm:w-9 flex items-center justify-center rounded-2xl bg-purple-100 hover:bg-purple-200 text-purple-700 border border-purple-300 shadow-xs cursor-pointer active:scale-95 transition-transform shrink-0"
-          >
-            <Keyboard size={14} />
+            {isDirectListening && directVoiceMode === 'answer' ? (
+              <Mic className="animate-pulse shrink-0" size={16} />
+            ) : isAnswerThinking ? (
+              <Sparkles className="animate-spin shrink-0" size={16} />
+            ) : (
+              <Sparkles size={16} className="shrink-0 text-amber-300" />
+            )}
+            <span className="truncate">
+              {isDirectListening && directVoiceMode === 'answer'
+                ? 'Listening...'
+                : isAnswerThinking
+                ? 'Thinking...'
+                : 'Ask AI'}
+            </span>
+            <span className="text-[9px] bg-black/20 text-white px-1.5 py-0.2 rounded-full font-mono font-bold shrink-0">
+              {selectedLanguage}
+            </span>
           </button>
         </div>
+
+        {/* COMPACT KEYBOARD BUTTON (Quick Text Type for Repeat or Question) */}
+        <button
+          id="btn-quick-keyboard"
+          onClick={handleChatClick}
+          title="Type text or question instead of speaking"
+          className="w-11 h-11 rounded-2xl bg-white/90 hover:bg-pink-50 text-purple-700 border-2 border-purple-200 shadow-md flex items-center justify-center cursor-pointer active:scale-95 transition-all shrink-0"
+        >
+          <Keyboard size={18} />
+        </button>
       </div>
 
-      {/* BOTTOM PET CARE & ACTIONS TOOLBAR */}
+      {/* THE 5 ICONIC CIRCULAR BOTTOM STATUS & ACTION BUTTONS (EXACTLY LIKE TALKING TOM 2!) */}
       <footer className="relative z-20 px-3 pb-2 sm:pb-3 shrink-0">
-        <div className="grid grid-cols-8 gap-1 bg-white/95 backdrop-blur-md p-1.5 rounded-3xl border border-pink-200/80 shadow-lg shadow-pink-900/5">
-          {/* 1. Feed */}
-          <button
-            id="btn-action-feed"
-            onClick={() => {
-              soundManager.playPop();
-              setIsQuickFoodOpen((prev) => !prev);
-            }}
-            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
-              isQuickFoodOpen ? 'bg-amber-100 ring-2 ring-amber-400' : 'hover:bg-amber-50'
-            }`}
-            title="Feed Hamster"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">🥣</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Feed</span>
-          </button>
+        <div className="flex items-center justify-around px-2 py-2 bg-white/85 backdrop-blur-md rounded-3xl border-2 border-white/90 shadow-xl gap-1">
+          {/* 1. SMILEY / HAPPINESS (PLAY & ENTERTAINMENT) */}
+          <div className="relative flex flex-col items-center">
+            {pet.stats.happiness < 30 && (
+              <span className="absolute -top-5.5 z-30 font-bubble text-[10px] font-extrabold text-white bg-rose-500 px-1.5 py-0.2 rounded-full border border-white shadow-xs animate-bounce">
+                {pet.stats.happiness}%
+              </span>
+            )}
+            <button
+              id="btn-dock-happy"
+              onClick={onOpenPlay}
+              className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 border-white shadow-lg active:scale-90 transition-all cursor-pointer group ${
+                pet.stats.happiness < 30
+                  ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white ring-2 ring-red-400'
+                  : pet.stats.happiness < 60
+                  ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white'
+                  : 'bg-gradient-to-br from-lime-400 to-green-500 text-white'
+              }`}
+              title={`Happiness: ${pet.stats.happiness}% - Tap to Play`}
+            >
+              {/* Glossy top reflection */}
+              <div className="absolute top-1 inset-x-2 h-3 rounded-t-full bg-white/30 pointer-events-none" />
+              <Smile size={24} className="group-hover:scale-110 transition-transform drop-shadow-sm" strokeWidth={2.5} />
+            </button>
+          </div>
 
-          {/* 2. Water */}
-          <button
-            id="btn-action-water"
-            onClick={handleWaterClick}
-            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
-              isDrinking ? 'bg-sky-100 ring-2 ring-sky-400' : 'hover:bg-sky-50'
-            }`}
-            title="Give Fresh Water"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">💧</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Water</span>
-          </button>
+          {/* 2. FORK & SPOON / HUNGER (KITCHEN & MEALS) */}
+          <div className="relative flex flex-col items-center">
+            {pet.stats.hunger < 30 && (
+              <span className="absolute -top-5.5 z-30 font-bubble text-[10px] font-extrabold text-white bg-rose-500 px-1.5 py-0.2 rounded-full border border-white shadow-xs animate-bounce">
+                {pet.stats.hunger}%
+              </span>
+            )}
+            <button
+              id="btn-dock-food"
+              onClick={() => {
+                soundManager.playPop();
+                setIsQuickFoodOpen((prev) => !prev);
+              }}
+              className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 border-white shadow-lg active:scale-90 transition-all cursor-pointer group ${
+                isQuickFoodOpen
+                  ? 'ring-4 ring-amber-400 scale-105'
+                  : ''
+              } ${
+                pet.stats.hunger < 30
+                  ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white ring-2 ring-red-400'
+                  : pet.stats.hunger < 60
+                  ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white'
+                  : 'bg-gradient-to-br from-lime-400 to-green-500 text-white'
+              }`}
+              title={`Hunger: ${pet.stats.hunger}% - Tap to Feed`}
+            >
+              <div className="absolute top-1 inset-x-2 h-3 rounded-t-full bg-white/30 pointer-events-none" />
+              <Utensils size={23} className="group-hover:scale-110 transition-transform drop-shadow-sm" strokeWidth={2.5} />
+            </button>
+          </div>
 
-          {/* 3. Play */}
-          <button
-            id="btn-action-play"
-            onClick={onOpenPlay}
-            className="flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-transform cursor-pointer group"
-            title="Play Ball / Mini-Games"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">🎾</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Play</span>
-          </button>
+          {/* 3. BATH / TOILET / CLEANLINESS (BATHROOM) */}
+          <div className="relative flex flex-col items-center">
+            {pet.stats.cleanliness < 30 && (
+              <span className="absolute -top-5.5 z-30 font-bubble text-[10px] font-extrabold text-white bg-rose-500 px-1.5 py-0.2 rounded-full border border-white shadow-xs animate-bounce">
+                {pet.stats.cleanliness}%
+              </span>
+            )}
+            <button
+              id="btn-dock-clean"
+              onClick={onOpenClean}
+              className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 border-white shadow-lg active:scale-90 transition-all cursor-pointer group ${
+                pet.stats.cleanliness < 30
+                  ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white ring-2 ring-red-400'
+                  : pet.stats.cleanliness < 60
+                  ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white'
+                  : 'bg-gradient-to-br from-lime-400 to-green-500 text-white'
+              }`}
+              title={`Cleanliness: ${pet.stats.cleanliness}% - Tap to Wash`}
+            >
+              <div className="absolute top-1 inset-x-2 h-3 rounded-t-full bg-white/30 pointer-events-none" />
+              <Bath size={23} className="group-hover:scale-110 transition-transform drop-shadow-sm" strokeWidth={2.5} />
+            </button>
+          </div>
 
-          {/* 4. Clean */}
-          <button
-            id="btn-action-clean"
-            onClick={onOpenClean}
-            className="flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl hover:bg-teal-50 active:scale-90 transition-transform cursor-pointer group"
-            title="Bath & Sponge Clean"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">🛁</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Clean</span>
-          </button>
+          {/* 4. MOON & STARS / ENERGY (BEDROOM & SLEEP) */}
+          <div className="relative flex flex-col items-center">
+            {pet.stats.energy < 30 && (
+              <span className="absolute -top-5.5 z-30 font-bubble text-[10px] font-extrabold text-white bg-rose-500 px-1.5 py-0.2 rounded-full border border-white shadow-xs animate-bounce">
+                {pet.stats.energy}%
+              </span>
+            )}
+            <button
+              id="btn-dock-sleep"
+              onClick={onToggleSleep}
+              className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 border-white shadow-lg active:scale-90 transition-all cursor-pointer group ${
+                pet.isSleeping
+                  ? 'bg-gradient-to-br from-indigo-800 to-slate-900 text-amber-300 ring-2 ring-indigo-400'
+                  : pet.stats.energy < 30
+                  ? 'bg-gradient-to-br from-rose-500 to-red-600 text-white ring-2 ring-red-400'
+                  : pet.stats.energy < 60
+                  ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white'
+                  : 'bg-gradient-to-br from-lime-400 to-green-500 text-white'
+              }`}
+              title={`Energy: ${pet.stats.energy}% - Tap to Sleep/Wake`}
+            >
+              <div className="absolute top-1 inset-x-2 h-3 rounded-t-full bg-white/30 pointer-events-none" />
+              {pet.isSleeping ? (
+                <Sun size={24} className="group-hover:scale-110 transition-transform drop-shadow-sm animate-spin-slow" strokeWidth={2.5} />
+              ) : (
+                <Moon size={23} className="group-hover:scale-110 transition-transform drop-shadow-sm" strokeWidth={2.5} />
+              )}
+            </button>
+          </div>
 
-          {/* 5. Sleep */}
-          <button
-            id="btn-action-sleep"
-            onClick={onToggleSleep}
-            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
-              pet.isSleeping ? 'bg-indigo-100 text-indigo-900 font-bold' : 'hover:bg-indigo-50'
-            }`}
-            title="Sleep & Rest"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">
-              {pet.isSleeping ? '☀️' : '😴'}
-            </span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">
-              {pet.isSleeping ? 'Wake' : 'Sleep'}
-            </span>
-          </button>
+          {/* 5. PLANE / GAMES / ACTIVITIES (TRAVEL & MINI-GAMES with Notification Badge!) */}
+          <div className="relative flex flex-col items-center">
+            <button
+              id="btn-dock-games"
+              onClick={onOpenMiniGames}
+              className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-lime-400 to-emerald-500 text-white flex items-center justify-center border-2 border-white shadow-lg active:scale-90 transition-all cursor-pointer group"
+              title="Mini-Games & Multiplayer Activities"
+            >
+              <div className="absolute top-1 inset-x-2 h-3 rounded-t-full bg-white/30 pointer-events-none" />
+              <Plane size={24} className="group-hover:scale-110 transition-transform drop-shadow-sm" strokeWidth={2.5} />
 
-          {/* 6. Dance */}
-          <button
-            id="btn-action-dance"
-            onClick={handleDanceClick}
-            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
-              isDancing ? 'bg-pink-100 text-pink-900 font-bold animate-pulse' : 'hover:bg-pink-50'
-            }`}
-            title="Dance Routine"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">💃</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Dance</span>
-          </button>
-
-          {/* 7. Sing */}
-          <button
-            id="btn-action-sing"
-            onClick={handleSingClick}
-            className={`flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl active:scale-90 transition-all cursor-pointer group ${
-              isSinging ? 'bg-purple-100 text-purple-900 font-bold animate-pulse' : 'hover:bg-purple-50'
-            }`}
-            title="Sing Cute Song"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">🎤</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Sing</span>
-          </button>
-
-          {/* 8. Shop */}
-          <button
-            id="btn-action-shop"
-            onClick={onOpenShop}
-            className="flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl hover:bg-orange-50 active:scale-90 transition-transform cursor-pointer group"
-            title="Pet Boutique Shop"
-          >
-            <span className="text-xl group-hover:scale-110 transition-transform">🛍️</span>
-            <span className="text-[10px] font-bubble font-bold text-stone-700 mt-0.5">Shop</span>
-          </button>
+              {/* Red Notification Badge (like '39' in Talking Tom 2 Screenshot 1!) */}
+              <span className="absolute -top-1 -right-1 font-bubble text-[10px] font-extrabold text-white bg-rose-600 px-1.5 py-0.2 rounded-full border-2 border-white shadow-md">
+                39
+              </span>
+            </button>
+          </div>
         </div>
       </footer>
 

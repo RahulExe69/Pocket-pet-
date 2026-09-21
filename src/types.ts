@@ -1,4 +1,62 @@
-export type PetType = 'hamster' | 'cat' | 'dog' | 'bunny' | 'panda';
+export type PetType =
+  // Rodents & Small Mammals
+  | 'hamster'
+  | 'chinchilla'
+  | 'ferret'
+  | 'gerbil'
+  | 'hedgehog'
+  | 'rat'
+  | 'badger'
+  | 'marmot'
+  | 'weasel'
+  | 'otter'
+  | 'river_otter'
+  | 'skunk'
+  // Felines & Predators
+  | 'cat'
+  | 'bobcat'
+  | 'lynx'
+  | 'sabertooth_tiger'
+  // Birds
+  | 'parakeet'
+  | 'cockatiel'
+  | 'crow'
+  | 'dodo'
+  | 'eagle'
+  | 'flamingo'
+  | 'hummingbird'
+  | 'kiwi'
+  | 'owl'
+  | 'peacock'
+  | 'pelican'
+  | 'seagull'
+  | 'swan'
+  | 'terror_bird'
+  // Aquatic & Marine
+  | 'goldfish'
+  | 'axolotl'
+  | 'angelfish'
+  | 'betta_fish'
+  | 'clownfish'
+  | 'eel'
+  | 'manta_ray'
+  | 'pufferfish'
+  | 'seahorse'
+  | 'stingray'
+  | 'swordfish'
+  // Reptiles
+  | 'gecko'
+  // Ungulates & Megafauna
+  | 'bighorn_sheep'
+  | 'mountain_goat'
+  | 'mammoth'
+  | 'woolly_rhino'
+  | 'glyptodon'
+  | 'megatherium'
+  // Prehistoric
+  | 'archaeopteryx'
+  | 'dimetrodon'
+  | 'trilobite';
 
 export type PetMood = 'happy' | 'hungry' | 'sleepy' | 'dirty' | 'excited' | 'sad';
 

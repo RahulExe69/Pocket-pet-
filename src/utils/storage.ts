@@ -1,5 +1,5 @@
 import { PetState, PetMood, PetType, PetStats, LifetimeStats, RoomCustomization } from '../types';
-import { INITIAL_PET_STATE } from '../data/initialData';
+import { INITIAL_PET_STATE, PET_CONFIGS } from '../data/initialData';
 
 const STORAGE_KEY = 'pocket_pet_save_v1';
 const SOUND_KEY = 'pocket_pet_sound_v1';
@@ -52,8 +52,8 @@ export function sanitizePetState(raw: unknown): PetState {
 
   const data = raw as Partial<PetState>;
 
-  const validTypes: PetType[] = ['hamster', 'cat', 'dog', 'bunny', 'panda'];
-  const type: PetType = (data.type && validTypes.includes(data.type)) ? data.type : INITIAL_PET_STATE.type;
+  const validTypes = Object.keys(PET_CONFIGS) as PetType[];
+  const type: PetType = (data.type && validTypes.includes(data.type as PetType)) ? (data.type as PetType) : INITIAL_PET_STATE.type;
 
   const rawStats = (data.stats || {}) as Partial<PetStats>;
   const stats = {

@@ -273,43 +273,29 @@ export const PetAvatar: React.FC<PetAvatarProps> = ({
           </g>
         );
 
-      case 'dog':
+      default:
         return (
-          <g id="species-dog">
-            {/* Floppy droopy puppy ears */}
-            <path
-              d="M 58 70 C 30 75 22 110 32 135 C 38 145 52 140 54 125 C 56 105 56 85 58 70 Z"
-              fill="#b87a48"
-              stroke="#4a3e3d"
-              strokeWidth="6"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M 162 70 C 190 75 198 110 188 135 C 182 145 168 140 166 125 C 164 105 164 85 162 70 Z"
-              fill="#b87a48"
-              stroke="#4a3e3d"
-              strokeWidth="6"
-              strokeLinejoin="round"
-            />
+          <g id="species-generic-pet">
+            {/* Round ears */}
+            <circle cx="56" cy="66" r="28" fill="#e1b12c" stroke="#4a3e3d" strokeWidth="6" />
+            <circle cx="56" cy="66" r="16" fill="#f8c6d3" />
+            <circle cx="164" cy="66" r="28" fill="#e1b12c" stroke="#4a3e3d" strokeWidth="6" />
+            <circle cx="164" cy="66" r="16" fill="#f8c6d3" />
 
             {/* Head & body */}
             <path
               d="M 44 165 C 36 100 56 65 110 65 C 164 65 184 100 176 165 C 168 195 52 195 44 165 Z"
-              fill="#e3ab76"
+              fill="#f5cd79"
               stroke="#4a3e3d"
               strokeWidth="6"
               strokeLinejoin="round"
             />
 
-            {/* Puppy eye patch */}
-            <ellipse cx="78" cy="116" rx="20" ry="22" fill="#d4975e" opacity="0.75" />
-
             {/* Muzzle */}
             <ellipse cx="110" cy="142" rx="34" ry="24" fill="#fffdf9" />
 
-            {/* Big black shiny nose */}
-            <ellipse cx="110" cy="126" rx="8" ry="6" fill="#3b2b2b" />
-            <ellipse cx="108" cy="124" rx="2.5" ry="1.5" fill="#ffffff" />
+            {/* Nose */}
+            <ellipse cx="110" cy="126" rx="6" ry="5" fill="#3b2b2b" />
 
             {/* Blush cheeks */}
             <ellipse cx="62" cy="138" rx="12" ry="8" fill="#ffb4b4" opacity="0.6" />
@@ -317,77 +303,6 @@ export const PetAvatar: React.FC<PetAvatarProps> = ({
 
             {/* Paws */}
             <g fill="#fffdf9" stroke="#4a3e3d" strokeWidth="4">
-              <ellipse cx="80" cy="178" rx="13" ry="9" />
-              <ellipse cx="140" cy="178" rx="13" ry="9" />
-            </g>
-          </g>
-        );
-
-      case 'bunny':
-        return (
-          <g id="species-bunny">
-            {/* Long tall bunny ears */}
-            <g stroke="#4a3e3d" strokeWidth="6" strokeLinejoin="round">
-              <path d="M 68 80 C 50 40 50 0 74 6 C 92 10 90 45 82 80 Z" fill="#ffffff" />
-              <path d="M 70 65 C 58 35 60 14 74 18 C 82 20 80 45 76 68 Z" fill="#ffcdd2" strokeWidth="0" />
-
-              <path d="M 152 80 C 170 40 170 0 146 6 C 128 10 130 45 138 80 Z" fill="#ffffff" />
-              <path d="M 150 65 C 162 35 160 14 146 18 C 138 20 140 45 144 68 Z" fill="#ffcdd2" strokeWidth="0" />
-            </g>
-
-            {/* Head & body */}
-            <path
-              d="M 44 165 C 36 100 56 68 110 68 C 164 68 184 100 176 165 C 168 195 52 195 44 165 Z"
-              fill="#ffffff"
-              stroke="#4a3e3d"
-              strokeWidth="6"
-              strokeLinejoin="round"
-            />
-
-            {/* Blush cheeks */}
-            <ellipse cx="60" cy="132" rx="15" ry="10" fill="#ffb4b4" opacity="0.75" />
-            <ellipse cx="160" cy="132" rx="15" ry="10" fill="#ffb4b4" opacity="0.75" />
-
-            {/* Pink heart nose */}
-            <polygon points="107,126 113,126 110,131" fill="#ff7675" stroke="#4a3e3d" strokeWidth="2" strokeLinejoin="round" />
-
-            {/* Bunny paws */}
-            <g fill="#ffffff" stroke="#4a3e3d" strokeWidth="4">
-              <ellipse cx="80" cy="178" rx="12" ry="9" />
-              <ellipse cx="140" cy="178" rx="12" ry="9" />
-            </g>
-          </g>
-        );
-
-      case 'panda':
-        return (
-          <g id="species-panda">
-            {/* Black round panda ears */}
-            <circle cx="56" cy="62" r="26" fill="#30333a" stroke="#4a3e3d" strokeWidth="6" />
-            <circle cx="164" cy="62" r="26" fill="#30333a" stroke="#4a3e3d" strokeWidth="6" />
-
-            {/* White face */}
-            <path
-              d="M 44 165 C 36 100 56 65 110 65 C 164 65 184 100 176 165 C 168 195 52 195 44 165 Z"
-              fill="#ffffff"
-              stroke="#4a3e3d"
-              strokeWidth="6"
-              strokeLinejoin="round"
-            />
-
-            {/* Black panda eye patches */}
-            <ellipse cx="78" cy="116" rx="20" ry="24" fill="#30333a" transform="rotate(-15 78 116)" />
-            <ellipse cx="142" cy="116" rx="20" ry="24" fill="#30333a" transform="rotate(15 142 116)" />
-
-            {/* Black nose */}
-            <ellipse cx="110" cy="128" rx="6" ry="4.5" fill="#30333a" />
-
-            {/* Blush */}
-            <ellipse cx="58" cy="142" rx="14" ry="8" fill="#ffb4b4" opacity="0.6" />
-            <ellipse cx="162" cy="142" rx="14" ry="8" fill="#ffb4b4" opacity="0.6" />
-
-            {/* Dark paws */}
-            <g fill="#30333a" stroke="#4a3e3d" strokeWidth="4">
               <ellipse cx="80" cy="178" rx="13" ry="9" />
               <ellipse cx="140" cy="178" rx="13" ry="9" />
             </g>

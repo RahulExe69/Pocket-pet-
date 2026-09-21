@@ -243,11 +243,7 @@ export const PetRunnerGame: React.FC<PetRunnerGameProps> = ({
           style={{ bottom: `${40 + petY * 1.6}px` }}
         >
           <div className="relative">
-            {petType === 'hamster' && '🐹'}
-            {petType === 'cat' && '🐱'}
-            {petType === 'dog' && '🐶'}
-            {petType === 'bunny' && '🐰'}
-            {petType === 'panda' && '🐼'}
+            {petType === 'hamster' ? '🐹' : petType === 'cat' ? '🐱' : '🐾'}
           </div>
         </div>
 
