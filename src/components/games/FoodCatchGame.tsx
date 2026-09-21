@@ -214,11 +214,7 @@ export const FoodCatchGame: React.FC<FoodCatchGameProps> = ({
           style={{ left: `${basketX}%` }}
         >
           <div className="text-3xl filter drop-shadow-md">
-            {petType === 'hamster' && '🐹'}
-            {petType === 'cat' && '🐱'}
-            {petType === 'dog' && '🐶'}
-            {petType === 'bunny' && '🐰'}
-            {petType === 'panda' && '🐼'}
+            {petType === 'hamster' ? '🐹' : petType === 'cat' ? '🐱' : '🐾'}
           </div>
           <div className="w-16 h-6 bg-amber-700/80 border-2 border-amber-900 rounded-b-xl flex items-center justify-center text-white text-[10px] font-bold shadow-md">
             🧺 Catch!

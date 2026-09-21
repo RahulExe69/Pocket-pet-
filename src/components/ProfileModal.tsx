@@ -5,6 +5,7 @@ import { PetState, PetType } from '../types';
 import { PET_CONFIGS } from '../data/initialData';
 import { getRequiredXP } from '../utils/storage';
 import { soundManager } from '../utils/audio';
+import { PetFaceAvatar } from './PetFaceAvatar';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface ProfileModalProps {
   pet: PetState;
   onRenamePet: (newName: string) => void;
   onSwitchPetType: (newType: PetType) => void;
+  onOpenAdoptionCenter?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -20,6 +22,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   pet,
   onRenamePet,
   onSwitchPetType,
+  onOpenAdoptionCenter,
 }) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(pet.name);
@@ -80,17 +83,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     },
   ];
 
-  const petTypes: PetType[] = [
-    'hamster',
-    'cat',
-    'chinchilla',
-    'ferret',
-    'hedgehog',
-    'gerbil',
-    'dog',
-    'bunny',
-    'panda',
-  ];
+  const petTypes = Object.keys(PET_CONFIGS) as PetType[];
 
   return (
     <AnimatePresence>
@@ -125,12 +118,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <div className="overflow-y-auto no-scrollbar py-3 space-y-4">
               {/* Pet ID Card Banner */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 via-orange-50 to-pink-50 border border-orange-200/80 shadow-xs flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-white shadow-xs border border-orange-200 flex items-center justify-center text-3xl">
-                  {pet.type === 'hamster' && '🐹'}
-                  {pet.type === 'cat' && '🐱'}
-                  {pet.type === 'dog' && '🐶'}
-                  {pet.type === 'bunny' && '🐰'}
-                  {pet.type === 'panda' && '🐼'}
+                <div className="w-16 h-16 rounded-2xl bg-white shadow-xs border border-orange-200 flex items-center justify-center p-1">
+                  <PetFaceAvatar type={pet.type} size={50} />
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -264,12 +253,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   <div className="flex items-center gap-1.5 text-xs font-bubble font-bold text-indigo-900">
                     <RefreshCw size={13} /> Switch Active Pet
                   </div>
-                  <span className="text-[11px] text-indigo-600 font-medium">Adoption Center</span>
+                  {onOpenAdoptionCenter && (
+                    <button
+                      onClick={() => {
+                        soundManager.playPop();
+                        onClose();
+                        onOpenAdoptionCenter();
+                      }}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-white px-2 py-0.5 rounded-full border border-indigo-200 shadow-2xs hover:bg-indigo-50 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <span>Full Studio (50) →</span>
+                    </button>
+                  )}
                 </div>
-                <div className="grid grid-cols-5 gap-1.5">
+                <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1">
                   {petTypes.map((ptype) => {
                     const isSelected = pet.type === ptype;
-                    const icons = { hamster: '🐹', cat: '🐱', dog: '🐶', bunny: '🐰', panda: '🐼' };
+                    const cfg = PET_CONFIGS[ptype];
                     return (
                       <button
                         key={ptype}
@@ -280,15 +280,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             onSwitchPetType(ptype);
                           }
                         }}
-                        className={`p-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all ${
+                        className={`p-1.5 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer min-h-[56px] ${
                           isSelected
-                            ? 'bg-indigo-600 text-white font-bold shadow-xs scale-105'
+                            ? 'bg-indigo-600 text-white font-bold shadow-xs scale-102 ring-2 ring-indigo-300'
                             : 'bg-white text-stone-700 border border-indigo-200/80 hover:bg-indigo-100/50'
                         }`}
                       >
-                        <span className="text-xl">{icons[ptype]}</span>
+                        <PetFaceAvatar type={ptype} size={28} />
                         <span className="text-[10px] capitalize truncate max-w-full font-bubble">
-                          {ptype}
+                          {cfg?.species || ptype}
                         </span>
                       </button>
                     );

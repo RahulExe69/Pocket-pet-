@@ -336,21 +336,11 @@ export function buildPetModel(type: PetType, customization: PetCustomization): P
   }
   headGroup.add(rightEar);
 
-  let earOuterGeo: THREE.BufferGeometry;
-  let earInnerGeo: THREE.BufferGeometry;
-
-  if (type === 'bunny') {
-    earOuterGeo = new THREE.CapsuleGeometry(0.1, 0.45, 8, 16);
-    earInnerGeo = new THREE.CapsuleGeometry(0.065, 0.35, 8, 16);
-    leftEar.position.set(-0.25, 0.55, -0.05);
-    rightEar.position.set(0.25, 0.55, -0.05);
-  } else {
-    // Hamster round, cup-shaped fluffy ears
-    earOuterGeo = new THREE.SphereGeometry(0.16, 18, 16);
-    earOuterGeo.scale(1.0, 1.05, 0.38);
-    earInnerGeo = new THREE.SphereGeometry(0.115, 16, 14);
-    earInnerGeo.scale(0.92, 0.96, 0.28);
-  }
+  // Fluffy round cup-shaped ears
+  const earOuterGeo = new THREE.SphereGeometry(0.16, 18, 16);
+  earOuterGeo.scale(1.0, 1.05, 0.38);
+  const earInnerGeo = new THREE.SphereGeometry(0.115, 16, 14);
+  earInnerGeo.scale(0.92, 0.96, 0.28);
 
   const earOuterMat = isHamster
     ? bodyMat
@@ -528,11 +518,10 @@ export function buildCustomizationItems(
     accessoryGroup.remove(accessoryGroup.children[0]);
   }
 
-  // 1. Cute Small Hat: Light Blue Beanie Hat with Small Pompom (Default for Hamster or chosen in closet)
+  // 1. Cute Small Hat: Light Blue Beanie Hat with Small Pompom (Only when chosen in closet)
   const isWearingBeanie =
     cust.hat === 'hat-beanie' ||
-    cust.accessory === 'hat-beanie' ||
-    (type === 'hamster' && (!cust.hat && !cust.accessory));
+    cust.accessory === 'hat-beanie';
 
   if (isWearingBeanie) {
     const beanieGroup = new THREE.Group();

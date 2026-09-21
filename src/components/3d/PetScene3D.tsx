@@ -120,12 +120,12 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
   const cameraAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
     theta: Math.PI / 4,
     phi: 1.32,
-    radius: 5.2,
+    radius: 6.8,
   });
   const targetAngleRef = useRef<{ theta: number; phi: number; radius: number }>({
     theta: Math.PI / 4,
     phi: 1.32,
-    radius: 5.2,
+    radius: 6.8,
   });
   const isDraggingRef = useRef<boolean>(false);
   const lastPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -428,13 +428,13 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
     const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 30);
     const initTheta = Math.PI / 4;
     const initPhi = 1.32;
-    const initRadius = 5.2;
+    const initRadius = 6.8;
     camera.position.set(
       initRadius * Math.sin(initTheta) * Math.sin(initPhi),
       initRadius * Math.cos(initPhi) + 0.35,
       initRadius * Math.cos(initTheta) * Math.sin(initPhi)
     );
-    camera.lookAt(0, 0.65, 0.1);
+    camera.lookAt(0, 0.72, 0.1);
     cameraRef.current = camera;
 
     // 3. Renderer
@@ -638,9 +638,9 @@ export const PetScene3D: React.FC<PetScene3DProps> = ({
         }
 
         if (floorPoint) {
-          // Clamp inside playable room boundary so hamster stays inside walls comfortably
-          const targetX = Math.max(-1.85, Math.min(1.85, floorPoint.x));
-          const targetZ = Math.max(-1.85, Math.min(1.85, floorPoint.z));
+          // Clamp inside playable room boundary so pet stays inside walls comfortably
+          const targetX = Math.max(-3.8, Math.min(3.8, floorPoint.x));
+          const targetZ = Math.max(-3.8, Math.min(3.8, floorPoint.z));
 
           soundManager.stopAllMusic();
           if (pet.isSleeping && onToggleSleep) {

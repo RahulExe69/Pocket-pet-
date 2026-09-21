@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { PetType, PetCustomization } from '../../types';
 import { PetNodes, buildCustomizationItems } from './petGeometries';
-import { getToonMaterial } from './threeHelpers';
 
-// Model path mapper for pet types
+// Model path mapper for pet types with dedicated individual GLBs
 const MODEL_PATHS: Record<string, string> = {
   hamster: '/models/hamster.glb',
   cat: '/models/cat.glb',
@@ -20,73 +20,250 @@ const MODEL_PATHS: Record<string, string> = {
   otter: '/models/otter.glb',
 };
 
+// Exact node name mapper in pets-compressed.glb for all 50 species
+const PET_NODE_NAMES: Record<string, string> = {
+  angelfish: 'Angelfish',
+  archaeopteryx: 'Archaeopteryx',
+  axolotl: 'Axolotl',
+  badger: 'Badger',
+  betta_fish: 'Betta_Fish',
+  bighorn_sheep: 'Bighorn_Sheep',
+  bobcat: 'Bobcat',
+  chinchilla: 'Chinchilla',
+  clownfish: 'Clownfish',
+  cockatiel: 'Cockatiel',
+  crow: 'Crow',
+  dimetrodon: 'Dimetrodon',
+  dodo: 'Dodo',
+  eagle: 'Eagle',
+  eel: 'Eel',
+  ferret: 'Ferret',
+  flamingo: 'Flamingo',
+  gecko: 'Gecko',
+  gerbil: 'Gerbil',
+  glyptodon: 'Glyptodon',
+  goldfish: 'Goldfish',
+  hamster: 'Hamster',
+  hedgehog: 'Hedgehog',
+  hummingbird: 'Hummingbird',
+  kiwi: 'Kiwi',
+  lynx: 'Lynx',
+  mammoth: 'Mammoth',
+  manta_ray: 'Manta_Ray',
+  marmot: 'Marmot',
+  megatherium: 'Megatherium',
+  mountain_goat: 'Mountain_Goat',
+  otter: 'Otter',
+  owl: 'Owl',
+  parakeet: 'Parakeet',
+  peacock: 'Peacock',
+  pelican: 'Pelican',
+  pufferfish: 'Pufferfish',
+  rat: 'Rat',
+  river_otter: 'River_Otter',
+  sabertooth_tiger: 'Sabertooth_Tiger',
+  seagull: 'Seagull',
+  seahorse: 'Seahorse',
+  skunk: 'Skunk',
+  stingray: 'Stingray',
+  swan: 'Swan',
+  swordfish: 'Swordfish',
+  terror_bird: 'Terror_Bird',
+  trilobite: 'Trilobite',
+  weasel: 'Weasel',
+  woolly_rhino: 'Woolly_Rhino',
+  cat: 'Bobcat',
+};
+
 // In-memory cache for loaded GLTF templates
 const gltfCache = new Map<string, THREE.Group>();
 const pendingPromises = new Map<string, Promise<THREE.Group | null>>();
 
+// Master model loader for pets-compressed.glb containing all 50 models
+let masterGLTFPromise: Promise<THREE.Group | null> | null = null;
+let masterGLTFScene: THREE.Group | null = null;
+
+async function loadMasterPetsGLB(): Promise<THREE.Group | null> {
+  if (masterGLTFScene) return masterGLTFScene;
+  if (masterGLTFPromise) return masterGLTFPromise;
+
+  masterGLTFPromise = new Promise<THREE.Group | null>(async (resolve) => {
+    try {
+      if (MeshoptDecoder.ready) {
+        await MeshoptDecoder.ready;
+      }
+      const loader = new GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      loader.load(
+        '/pets-compressed.glb',
+        (gltf) => {
+          const root = gltf.scene;
+          root.traverse((obj) => {
+            if ((obj as THREE.Mesh).isMesh) {
+              const mesh = obj as THREE.Mesh;
+              mesh.castShadow = true;
+              mesh.receiveShadow = true;
+              if (mesh.material) {
+                const mat = mesh.material as THREE.MeshStandardMaterial;
+                mat.roughness = 0.65;
+                mat.metalness = 0.04;
+                mat.needsUpdate = true;
+                if (mat.map) {
+                  mat.map.colorSpace = THREE.SRGBColorSpace;
+                  mat.map.generateMipmaps = true;
+                  mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                  mat.map.needsUpdate = true;
+                }
+              }
+            }
+          });
+          masterGLTFScene = root;
+          resolve(root);
+        },
+        undefined,
+        (error) => {
+          console.warn('Could not load master pets-compressed.glb:', error);
+          resolve(null);
+        }
+      );
+    } catch (err) {
+      console.warn('Failed to initialize GLTF loader with MeshoptDecoder:', err);
+      resolve(null);
+    }
+  });
+
+  return masterGLTFPromise;
+}
+
 export function getGLTFModelUrl(type: PetType | string): string {
-  return MODEL_PATHS[type] || MODEL_PATHS.hamster;
+  return MODEL_PATHS[type] || '/pets-compressed.glb';
+}
+
+function standardizePetModel(model: THREE.Object3D, name: string): THREE.Group {
+  const wrapper = new THREE.Group();
+  wrapper.name = `pet-model-${name}`;
+  wrapper.add(model);
+  wrapper.updateMatrixWorld(true);
+
+  const bbox = new THREE.Box3().setFromObject(wrapper);
+  const size = bbox.getSize(new THREE.Vector3());
+  const center = bbox.getCenter(new THREE.Vector3());
+
+  // Center horizontally and ground bottom at Y = 0
+  model.position.set(-center.x, -bbox.min.y, -center.z);
+  wrapper.updateMatrixWorld(true);
+
+  // Standardize height to 1.10 units (eye-level in room and preview)
+  const targetHeight = 1.10;
+  const naturalHeight = Math.max(0.01, size.y);
+  const fitScale = targetHeight / naturalHeight;
+  model.scale.multiplyScalar(fitScale);
+  wrapper.updateMatrixWorld(true);
+
+  return wrapper;
 }
 
 /**
  * Loads a pet GLTF model asynchronously and returns a prepared, cloned THREE.Group
+ * for any of the 50 pet species.
  */
 export async function loadGLTFPet(type: PetType | string): Promise<THREE.Group | null> {
-  const url = getGLTFModelUrl(type);
+  // Check if this pet type has an individual dedicated GLB file
+  const individualUrl = MODEL_PATHS[type];
+  if (individualUrl) {
+    if (gltfCache.has(individualUrl)) {
+      return gltfCache.get(individualUrl)!.clone(true);
+    }
 
-  if (gltfCache.has(url)) {
-    return gltfCache.get(url)!.clone(true);
-  }
-
-  if (pendingPromises.has(url)) {
-    const res = await pendingPromises.get(url);
-    return res ? res.clone(true) : null;
-  }
-
-  const promise = new Promise<THREE.Group | null>((resolve) => {
-    const loader = new GLTFLoader();
-    loader.load(
-      url,
-      (gltf) => {
-        const root = gltf.scene;
-
-        // Optimize materials and shadows
-        root.traverse((obj) => {
-          if ((obj as THREE.Mesh).isMesh) {
-            const mesh = obj as THREE.Mesh;
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-
-            if (mesh.material) {
-              const mat = mesh.material as THREE.MeshStandardMaterial;
-              mat.roughness = 0.65;
-              mat.metalness = 0.04;
-              mat.needsUpdate = true;
-              if (mat.map) {
-                mat.map.colorSpace = THREE.SRGBColorSpace;
-                mat.map.generateMipmaps = true;
-                mat.map.minFilter = THREE.LinearMipmapLinearFilter;
-                mat.map.needsUpdate = true;
+    if (pendingPromises.has(individualUrl)) {
+      const res = await pendingPromises.get(individualUrl);
+      if (res) return res.clone(true);
+    } else {
+      const promise = new Promise<THREE.Group | null>((resolve) => {
+        const loader = new GLTFLoader();
+        loader.load(
+          individualUrl,
+          (gltf) => {
+            const root = gltf.scene;
+            root.traverse((obj) => {
+              if ((obj as THREE.Mesh).isMesh) {
+                const mesh = obj as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                if (mesh.material) {
+                  const mat = mesh.material as THREE.MeshStandardMaterial;
+                  mat.roughness = 0.65;
+                  mat.metalness = 0.04;
+                  mat.needsUpdate = true;
+                  if (mat.map) {
+                    mat.map.colorSpace = THREE.SRGBColorSpace;
+                    mat.map.generateMipmaps = true;
+                    mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                    mat.map.needsUpdate = true;
+                  }
+                }
               }
-            }
-          }
-        });
+            });
+            const standardized = standardizePetModel(root, String(type));
+            gltfCache.set(individualUrl, standardized);
+            resolve(standardized.clone(true));
+          },
+          undefined,
+          () => resolve(null)
+        );
+      });
 
-        gltfCache.set(url, root);
-        resolve(root.clone(true));
-      },
-      undefined,
-      (error) => {
-        console.warn(`Could not load GLTF model from ${url}, falling back to procedural model:`, error);
-        resolve(null);
-      }
-    );
+      pendingPromises.set(individualUrl, promise);
+      const res = await promise;
+      pendingPromises.delete(individualUrl);
+      if (res) return res.clone(true);
+    }
+  }
+
+  // Look up model from master pets-compressed.glb containing all 50 models
+  const targetNodeName = PET_NODE_NAMES[type] || type;
+  const masterRoot = await loadMasterPetsGLB();
+  if (!masterRoot) return null;
+
+  // Search under RootNode first to preserve authentic top-level upright rotation and scale
+  let rootNode: THREE.Object3D | null = null;
+  masterRoot.traverse((obj) => {
+    if (!rootNode && obj.name === 'RootNode') {
+      rootNode = obj;
+    }
   });
 
-  pendingPromises.set(url, promise);
-  const result = await promise;
-  pendingPromises.delete(url);
-  return result ? result.clone(true) : null;
+  const searchRoot = rootNode || masterRoot;
+  let targetObj: THREE.Object3D | null = null;
+
+  // 1. Direct child of RootNode (e.g., 'Marmot', 'Weasel', 'Cockatiel', 'Bobcat')
+  for (const child of searchRoot.children) {
+    if (child.name.toLowerCase() === targetNodeName.toLowerCase()) {
+      targetObj = child;
+      break;
+    }
+  }
+
+  // 2. Fallback search
+  if (!targetObj) {
+    searchRoot.traverse((obj) => {
+      if (!targetObj && obj.name && obj.name.toLowerCase() === targetNodeName.toLowerCase()) {
+        targetObj = obj;
+      }
+    });
+  }
+
+  if (targetObj) {
+    // Clone targetObj preserving its upright rotation & scale
+    const cloned = (targetObj as THREE.Object3D).clone(true) as THREE.Group;
+    // Zero out the grid position offset
+    cloned.position.set(0, 0, 0);
+
+    const standardized = standardizePetModel(cloned, String(type));
+    return standardized;
+  }
+
+  return null;
 }
 
 /**
@@ -101,35 +278,16 @@ export function buildGLTFPetNodes(
   const root = new THREE.Group();
   root.name = `pet-root-gltf-${type}`;
 
-  // Measure bounding box to normalize scale and center
-  gltfModel.updateMatrixWorld(true);
-  const bbox = new THREE.Box3().setFromObject(gltfModel);
-  const size = bbox.getSize(new THREE.Vector3());
-  const center = bbox.getCenter(new THREE.Vector3());
-
-  // Target height is ~1.10 units (proportional eye-level in Talking Tom room)
-  const targetHeight = 1.10;
-  const currentHeight = Math.max(0.01, size.y);
-  const fitScale = targetHeight / currentHeight;
-
-  // Scale model
-  gltfModel.scale.set(fitScale, fitScale, fitScale);
-
   // Body group for breathing, waddling, jumping, rotating
   // In the scene, bodyGroup.position.y is 0.55 at rest.
-  // The bottom of the pet model must touch the floor (world Y=0) at rest.
-  // So inside bodyGroup, the bottom of the pet should be at y = -0.55.
+  // gltfModel is already centered and grounded with bottom at Y=0.
+  // Positioning gltfModel at y = -0.55 grounds it precisely at world Y=0 (the floor).
   const bodyGroup = new THREE.Group();
   bodyGroup.name = 'body-group';
   bodyGroup.position.y = 0.55;
   root.add(bodyGroup);
 
-  // Center horizontally, and position bottom at y = -0.55 in bodyGroup
-  gltfModel.position.set(
-    -center.x * fitScale,
-    -bbox.min.y * fitScale - 0.55,
-    -center.z * fitScale
-  );
+  gltfModel.position.set(0, -0.55, 0);
   bodyGroup.add(gltfModel);
 
   // Head group for accessories (hats, crowns, glasses)

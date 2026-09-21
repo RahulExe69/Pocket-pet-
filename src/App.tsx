@@ -242,20 +242,26 @@ export default function App() {
     saveSoundPreference(enabled);
   };
 
-  // Adoption complete handler
-  const handleAdoptPet = (type: PetType, name: string) => {
-    const adoptedPet: PetState = {
-      ...INITIAL_PET_STATE,
-      type,
-      name,
-      unlockedPets: [type],
-      adoptedAt: Date.now(),
-      customization: {
-        accessory: type === 'hamster' ? 'hat-sprout' : undefined,
-      },
-    };
-    setPet(adoptedPet);
-    savePet(adoptedPet);
+  // Adoption / Companion Swap handler
+  const handleAdoptPet = (type: PetType, name?: string) => {
+    setPet((prev) => {
+      const companionName = name?.trim() || PET_CONFIGS[type]?.name || prev.name;
+      const updatedUnlocked = prev.unlockedPets.includes(type)
+        ? prev.unlockedPets
+        : [...prev.unlockedPets, type];
+
+      const swappedPet: PetState = {
+        ...prev,
+        type,
+        name: companionName,
+        unlockedPets: updatedUnlocked,
+        customization: prev.type === type ? prev.customization : {},
+      };
+      savePet(swappedPet);
+      return swappedPet;
+    });
+
+    triggerSpeech(`Say hello to your ${PET_CONFIGS[type]?.species || 'companion'}! 🐾✨`);
     setCurrentScreen('home');
   };
 
@@ -694,7 +700,11 @@ export default function App() {
 
         {/* Screen 2: Pet Adoption / Selection */}
         {currentScreen === 'pet-selection' && (
-          <PetSelectionScreen onAdoptPet={handleAdoptPet} />
+          <PetSelectionScreen
+            onAdoptPet={handleAdoptPet}
+            onClose={() => setCurrentScreen('home')}
+            initialType={pet.type}
+          />
         )}
 
         {/* Screen 3: Pet Home Screen */}
@@ -702,6 +712,7 @@ export default function App() {
           <HomeScreen
             pet={pet}
             mood={currentMood}
+            onOpenPetSelection={() => setCurrentScreen('pet-selection')}
             onPetClick={handlePetInteraction}
             onOpenFeed={() => setIsFoodOpen(true)}
             onFeedItem={handleFeedItem}
@@ -798,6 +809,7 @@ export default function App() {
           pet={pet}
           onRenamePet={handleRenamePet}
           onSwitchPetType={handleSwitchPetType}
+          onOpenAdoptionCenter={() => setCurrentScreen('pet-selection')}
         />
 
         {/* Daily Rewards Modal */}

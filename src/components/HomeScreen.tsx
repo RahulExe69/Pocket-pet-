@@ -43,6 +43,7 @@ import {
 } from '../utils/speech';
 import { askGeminiHamster, ChatHistoryItem } from '../services/gemini';
 import { soundManager } from '../utils/audio';
+import { PetFaceAvatar } from './PetFaceAvatar';
 
 interface HomeScreenProps {
   pet: PetState;
@@ -74,6 +75,7 @@ interface HomeScreenProps {
   activeGame?: MultiplayerMiniGameType | null;
   modelStyle?: 'textured' | 'mochi';
   onToggleModelStyle?: (style: 'textured' | 'mochi') => void;
+  onOpenPetSelection?: () => void;
 }
 
 // 3 Distinct Foods for Feeding the Hamster
@@ -103,7 +105,7 @@ const THREE_FOODS: (FoodItem & { colorBg: string; borderColor: string; tag: stri
     energyBoost: 14,
     description: 'Fresh, juicy garden carrot packed with vitamins!',
     levelRequired: 1,
-    favoriteFor: ['bunny'],
+    favoriteFor: ['marmot', 'mountain_goat'],
     colorBg: 'bg-orange-50 hover:bg-orange-100/80',
     borderColor: 'border-orange-300',
     tag: '🥕 Garden Fresh',
@@ -154,6 +156,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   activeGame = null,
   modelStyle = 'textured',
   onToggleModelStyle,
+  onOpenPetSelection,
 }) => {
   const [isDrinking, setIsDrinking] = useState<boolean>(false);
   const [isDancing, setIsDancing] = useState<boolean>(false);
@@ -860,6 +863,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* SUB-RIBBON: Language Selector, Pet ID, Multiplayer (Compact Floating Game Pills) */}
       <div className="relative z-20 px-3 py-0.5 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar shrink-0 text-[11px]">
+        {/* Pet Avatar & Quick Passport Button */}
+        <button
+          id="btn-open-profile-pill"
+          onClick={onOpenProfile}
+          className="shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/85 backdrop-blur-xs border border-pink-200/80 shadow-2xs font-bubble text-[11px] cursor-pointer hover:bg-white text-stone-800 active:scale-95 transition-all"
+          title="View Passport & Profile"
+        >
+          <PetFaceAvatar type={pet.type} size={18} />
+          <span className="font-bold truncate max-w-[70px]">{pet.name}</span>
+        </button>
+
+        {/* Quick Swap Pet Companion Button (50 Species) */}
+        {onOpenPetSelection && (
+          <button
+            id="btn-quick-swap-pet"
+            onClick={onOpenPetSelection}
+            className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-400 to-orange-400 text-stone-900 font-bubble text-[10px] font-black shadow-2xs hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            title="Swap your active pet companion anytime (50 species)"
+          >
+            <span>🐾</span>
+            <span>Swap Pet</span>
+          </button>
+        )}
+
         {/* Unique Pet ID */}
         <button
           id="pet-id-top-display"

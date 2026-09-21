@@ -67,15 +67,15 @@ export function buildRoomEnvironment(
   nightMoon.castShadow = true;
   nightLights.add(nightMoon);
 
-  const nightCozyLamp = new THREE.PointLight(0xffb1c5, 1.5, 5);
-  nightCozyLamp.position.set(2.2, 1.2, -1.8);
+  const nightCozyLamp = new THREE.PointLight(0xffb1c5, 1.6, 8);
+  nightCozyLamp.position.set(3.4, 1.5, -3.0);
   nightLights.add(nightCozyLamp);
 
   dayLights.visible = !isSleeping;
   nightLights.visible = isSleeping;
 
-  // 2. Floor (Soft pastel pink #FFE9F0 bright toy house flooring)
-  const floorGeo = new THREE.BoxGeometry(6.5, 0.2, 6.5);
+  // 2. Floor (Soft pastel pink #FFE9F0 bright toy house flooring - Expanded Spacious Room)
+  const floorGeo = new THREE.BoxGeometry(10.5, 0.2, 10.5);
   let floorColor = 0xffe9f0; // Soft pastel pink #FFE9F0 (User requested)
   let floorRoughness = 0.38;
 
@@ -97,14 +97,14 @@ export function buildRoomEnvironment(
 
   // Decorative border plinths/baseboards (Crisp clean white toy-house baseboard)
   const baseboardMat = getToonMaterial(0xffffff, 0.25);
-  const backBaseGeo = new THREE.BoxGeometry(6.5, 0.18, 0.1);
+  const backBaseGeo = new THREE.BoxGeometry(10.5, 0.18, 0.1);
   const backBase = new THREE.Mesh(backBaseGeo, baseboardMat);
-  backBase.position.set(0, 0.09, -3.2);
+  backBase.position.set(0, 0.09, -5.2);
   group.add(backBase);
 
-  const leftBaseGeo = new THREE.BoxGeometry(0.1, 0.18, 6.5);
+  const leftBaseGeo = new THREE.BoxGeometry(0.1, 0.18, 10.5);
   const leftBase = new THREE.Mesh(leftBaseGeo, baseboardMat);
-  leftBase.position.set(-3.2, 0.09, 0);
+  leftBase.position.set(-5.2, 0.09, 0);
   group.add(leftBase);
 
   // 3. Walls (4 Inward-facing walls with FrontSide culling for seamless 360° rotation)
@@ -123,32 +123,32 @@ export function buildRoomEnvironment(
   wallMat.side = THREE.FrontSide; // Back-face culling: walls facing away from camera become automatically invisible!
 
   // Back Wall (facing +Z into room)
-  const backWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
+  const backWallGeo = new THREE.PlaneGeometry(10.5, 5.2);
   const backWallMesh = new THREE.Mesh(backWallGeo, wallMat);
-  backWallMesh.position.set(0, 2.0, -3.25);
+  backWallMesh.position.set(0, 2.5, -5.25);
   backWallMesh.receiveShadow = true;
   group.add(backWallMesh);
 
   // Left Wall (facing +X into room)
-  const leftWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
+  const leftWallGeo = new THREE.PlaneGeometry(10.5, 5.2);
   const leftWallMesh = new THREE.Mesh(leftWallGeo, wallMat);
-  leftWallMesh.position.set(-3.25, 2.0, 0);
+  leftWallMesh.position.set(-5.25, 2.5, 0);
   leftWallMesh.rotation.y = Math.PI / 2;
   leftWallMesh.receiveShadow = true;
   group.add(leftWallMesh);
 
   // Right Wall (facing -X into room)
-  const rightWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
+  const rightWallGeo = new THREE.PlaneGeometry(10.5, 5.2);
   const rightWallMesh = new THREE.Mesh(rightWallGeo, wallMat);
-  rightWallMesh.position.set(3.25, 2.0, 0);
+  rightWallMesh.position.set(5.25, 2.5, 0);
   rightWallMesh.rotation.y = -Math.PI / 2;
   rightWallMesh.receiveShadow = true;
   group.add(rightWallMesh);
 
   // Front Wall (facing -Z into room)
-  const frontWallGeo = new THREE.PlaneGeometry(6.5, 4.2);
+  const frontWallGeo = new THREE.PlaneGeometry(10.5, 5.2);
   const frontWallMesh = new THREE.Mesh(frontWallGeo, wallMat);
-  frontWallMesh.position.set(0, 2.0, 3.25);
+  frontWallMesh.position.set(0, 2.5, 5.25);
   frontWallMesh.rotation.y = Math.PI;
   frontWallMesh.receiveShadow = true;
   group.add(frontWallMesh);
@@ -156,37 +156,37 @@ export function buildRoomEnvironment(
   // Cute toy-house chair rail & wainscoting molding trim along walls
   const chairRailMat = getToonMaterial(0xffffff, 0.25);
   chairRailMat.side = THREE.FrontSide;
-  const railGeo = new THREE.PlaneGeometry(6.5, 0.08);
+  const railGeo = new THREE.PlaneGeometry(10.5, 0.08);
 
   const backRail = new THREE.Mesh(railGeo, chairRailMat);
-  backRail.position.set(0, 1.35, -3.24);
+  backRail.position.set(0, 1.55, -5.24);
   group.add(backRail);
 
   const leftRail = new THREE.Mesh(railGeo, chairRailMat);
-  leftRail.position.set(-3.24, 1.35, 0);
+  leftRail.position.set(-5.24, 1.55, 0);
   leftRail.rotation.y = Math.PI / 2;
   group.add(leftRail);
 
   const rightRail = new THREE.Mesh(railGeo, chairRailMat);
-  rightRail.position.set(3.24, 1.35, 0);
+  rightRail.position.set(5.24, 1.55, 0);
   rightRail.rotation.y = -Math.PI / 2;
   group.add(rightRail);
 
   const frontRail = new THREE.Mesh(railGeo, chairRailMat);
-  frontRail.position.set(0, 1.35, 3.24);
+  frontRail.position.set(0, 1.55, 5.24);
   frontRail.rotation.y = Math.PI;
   group.add(frontRail);
 
   // 4. Window with Scenic Sky
   const windowGroup = new THREE.Group();
-  windowGroup.position.set(-1.2, 2.3, -3.18);
+  windowGroup.position.set(-2.2, 2.9, -5.18);
 
-  const winFrameGeo = new THREE.BoxGeometry(1.6, 1.8, 0.08);
+  const winFrameGeo = new THREE.BoxGeometry(2.2, 2.3, 0.08);
   const winFrameMat = getToonMaterial(0xffffff, 0.2);
   const winFrame = new THREE.Mesh(winFrameGeo, winFrameMat);
   windowGroup.add(winFrame);
 
-  const glassGeo = new THREE.PlaneGeometry(1.35, 1.55);
+  const glassGeo = new THREE.PlaneGeometry(1.9, 2.0);
   const glassColor = isSleeping ? 0x130f40 : 0x74b9ff;
   const glassMat = getEmissiveMaterial(glassColor, isSleeping ? 0.3 : 0.6);
   const glass = new THREE.Mesh(glassGeo, glassMat);
@@ -194,17 +194,17 @@ export function buildRoomEnvironment(
   windowGroup.add(glass);
 
   // Window mullions (crossbars)
-  const barH = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.05, 0.06), winFrameMat);
+  const barH = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.05, 0.06), winFrameMat);
   barH.position.z = 0.05;
   windowGroup.add(barH);
-  const barV = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.55, 0.06), winFrameMat);
+  const barV = new THREE.Mesh(new THREE.BoxGeometry(0.05, 2.0, 0.06), winFrameMat);
   barV.position.z = 0.05;
   windowGroup.add(barV);
 
   // Window sill
-  const sillGeo = new THREE.BoxGeometry(1.8, 0.08, 0.22);
+  const sillGeo = new THREE.BoxGeometry(2.4, 0.08, 0.24);
   const sill = new THREE.Mesh(sillGeo, winFrameMat);
-  sill.position.set(0, -0.94, 0.08);
+  sill.position.set(0, -1.18, 0.08);
   windowGroup.add(sill);
 
   group.add(windowGroup);
@@ -212,7 +212,7 @@ export function buildRoomEnvironment(
   // 5. 3D Pet Bed (Based on room.bed)
   const bedGroup = new THREE.Group();
   bedGroup.name = 'pet-bed';
-  const bedPosition = new THREE.Vector3(1.9, 0, -1.8);
+  const bedPosition = new THREE.Vector3(3.2, 0, -3.0);
   bedGroup.position.copy(bedPosition);
 
   buildBedModel(bedGroup, room.bed);
@@ -221,7 +221,7 @@ export function buildRoomEnvironment(
   // 6. Food Bowl (Ceramic bowl with delicious dynamic 3D seeds / treats)
   const foodBowlGroup = new THREE.Group();
   foodBowlGroup.name = 'food-bowl';
-  const foodBowlPosition = new THREE.Vector3(-1.8, 0, 1.2);
+  const foodBowlPosition = new THREE.Vector3(-3.2, 0, 1.8);
   foodBowlGroup.position.copy(foodBowlPosition);
 
   // Outer ceramic bowl body
@@ -267,7 +267,7 @@ export function buildRoomEnvironment(
   // 7. Water Bowl / Dispenser (Ceramic dish with crystal water & ripple)
   const waterBowlGroup = new THREE.Group();
   waterBowlGroup.name = 'water-bowl';
-  const waterBowlPosition = new THREE.Vector3(-1.8, 0, 0.2);
+  const waterBowlPosition = new THREE.Vector3(-3.2, 0, 0.2);
   waterBowlGroup.position.copy(waterBowlPosition);
 
   // Ceramic water bowl
@@ -315,7 +315,7 @@ export function buildRoomEnvironment(
   // 8. 3D Toy in Room (Ball, duck, or yarn)
   const toyGroup = new THREE.Group();
   toyGroup.name = 'pet-toy';
-  const toyPosition = new THREE.Vector3(0.9, 0, 1.4);
+  const toyPosition = new THREE.Vector3(1.6, 0, 2.2);
   toyGroup.position.copy(toyPosition);
 
   buildToyModel(toyGroup);
@@ -475,15 +475,15 @@ function buildDecorModel(group: THREE.Group, decorType: string) {
   if (decorType === 'decor-lights') {
     // String Fairy Lights along back wall
     const stringGroup = new THREE.Group();
-    stringGroup.position.set(0, 3.2, -3.15);
+    stringGroup.position.set(0, 3.8, -5.15);
 
     const lightColors = [0xff7675, 0x74b9ff, 0x55efc4, 0xfdcb6e, 0xa29bfe];
-    for (let i = 0; i < 7; i++) {
-      const bulbGeo = new THREE.SphereGeometry(0.08, 10, 10);
+    for (let i = 0; i < 9; i++) {
+      const bulbGeo = new THREE.SphereGeometry(0.09, 10, 10);
       const bulbMat = getEmissiveMaterial(lightColors[i % lightColors.length], 0.9);
       const bulb = new THREE.Mesh(bulbGeo, bulbMat);
-      const x = -2.4 + i * 0.8;
-      const sag = Math.sin((i / 6) * Math.PI) * 0.25;
+      const x = -4.0 + i * 1.0;
+      const sag = Math.sin((i / 8) * Math.PI) * 0.35;
       bulb.position.set(x, -sag, 0);
       stringGroup.add(bulb);
     }
@@ -491,16 +491,16 @@ function buildDecorModel(group: THREE.Group, decorType: string) {
   } else if (decorType === 'decor-plushie') {
     // Teddy Bear Plushie on corner table
     const plushGroup = new THREE.Group();
-    plushGroup.position.set(2.4, 0.35, -2.6);
+    plushGroup.position.set(4.2, 0.35, -4.0);
 
-    const headGeo = new THREE.SphereGeometry(0.22, 16, 16);
+    const headGeo = new THREE.SphereGeometry(0.24, 16, 16);
     const bearMat = getToonMaterial(0x833471, 0.6);
     const head = new THREE.Mesh(headGeo, bearMat);
     head.position.y = 0.38;
     head.castShadow = true;
     plushGroup.add(head);
 
-    const bodyGeo = new THREE.SphereGeometry(0.26, 16, 16);
+    const bodyGeo = new THREE.SphereGeometry(0.28, 16, 16);
     const body = new THREE.Mesh(bodyGeo, bearMat);
     body.position.y = 0.18;
     body.castShadow = true;
@@ -508,8 +508,8 @@ function buildDecorModel(group: THREE.Group, decorType: string) {
 
     group.add(plushGroup);
   } else if (decorType === 'decor-rug') {
-    // Cute Bear Face Rug on center floor
-    const rugGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.02, 32);
+    // Cute Bear Face Rug on center floor - larger for spacious room
+    const rugGeo = new THREE.CylinderGeometry(1.8, 1.8, 0.02, 32);
     const rugMat = getToonMaterial(0xeccc68, 0.8);
     const rug = new THREE.Mesh(rugGeo, rugMat);
     rug.position.set(0, 0.015, 0);
@@ -518,25 +518,25 @@ function buildDecorModel(group: THREE.Group, decorType: string) {
   } else {
     // Default Potted Plant with Leaves
     const plantGroup = new THREE.Group();
-    plantGroup.position.set(2.4, 0, 0.8);
+    plantGroup.position.set(4.0, 0, 1.2);
 
     // Terracotta pot
-    const potGeo = new THREE.CylinderGeometry(0.28, 0.2, 0.45, 16);
+    const potGeo = new THREE.CylinderGeometry(0.32, 0.22, 0.5, 16);
     const potMat = getToonMaterial(0xe17055, 0.5);
     const pot = new THREE.Mesh(potGeo, potMat);
-    pot.position.y = 0.225;
+    pot.position.y = 0.25;
     pot.castShadow = true;
     plantGroup.add(pot);
 
     // Green leaves
-    const leafGeo = new THREE.SphereGeometry(0.22, 12, 10);
+    const leafGeo = new THREE.SphereGeometry(0.25, 12, 10);
     leafGeo.scale(1.2, 0.3, 0.7);
     const plantLeafMat = getToonMaterial(0x2ed573, 0.4);
 
     for (let i = 0; i < 4; i++) {
       const leaf = new THREE.Mesh(leafGeo, plantLeafMat);
       const angle = (i / 4) * Math.PI * 2;
-      leaf.position.set(Math.sin(angle) * 0.18, 0.48, Math.cos(angle) * 0.18);
+      leaf.position.set(Math.sin(angle) * 0.2, 0.52, Math.cos(angle) * 0.2);
       leaf.rotation.y = angle;
       leaf.rotation.z = 0.3;
       plantGroup.add(leaf);
